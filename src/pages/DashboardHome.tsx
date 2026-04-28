@@ -40,11 +40,11 @@ const PRI: Record<string, { c: string; bg: string; lbl: string; dot: string }> =
 };
 
 /* ─── sub-components ─── */
-function PillChart({ data, color = 'hsl(150 60% 48%)' }: { data: number[]; color?: string }) {
+const PillChart = forwardRef<HTMLDivElement, { data: number[]; color?: string }>(function PillChart({ data, color = 'hsl(150 60% 48%)' }, ref) {
   const max = Math.max(...data, 1);
   const labels = 'SMTWTFS';
   return (
-    <div className="flex items-end gap-1.5 w-full h-full">
+    <div ref={ref} className="flex items-end gap-1.5 w-full h-full">
       {data.map((v, i) => (
         <div key={i} className="flex flex-col items-center gap-1.5 flex-1 h-full">
           <div className="flex-1 flex items-end w-full">
@@ -59,7 +59,7 @@ function PillChart({ data, color = 'hsl(150 60% 48%)' }: { data: number[]; color
       ))}
     </div>
   );
-}
+});
 
 const WH = forwardRef<HTMLDivElement, { title: string; sub?: string; action?: string; onAction?: () => void; light?: boolean }>(
   ({ title, sub, action, onAction, light }, ref) => {
@@ -82,7 +82,7 @@ const WH = forwardRef<HTMLDivElement, { title: string; sub?: string; action?: st
 WH.displayName = 'WidgetHeader';
 
 /* ─── Main Dashboard ─── */
-export default function DashboardHome() {
+const DashboardHome = forwardRef<HTMLDivElement>(function DashboardHome(_, ref) {
   const { websites, buildProjects, tasks, notes, payments, ideas, habits } = useDashboard();
   const { setActiveSection } = useNavigationStore();
   const { userName } = useSettingsStore();
@@ -117,7 +117,7 @@ export default function DashboardHome() {
   const darkCard = 'rounded-2xl sm:rounded-3xl overflow-hidden';
 
   return (
-    <div className="flex flex-col gap-3 sm:gap-5">
+    <div ref={ref} className="flex flex-col gap-3 sm:gap-5">
 
       {/* ── Page header ── */}
       <motion.div {...fu(0)} className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4">
@@ -576,4 +576,6 @@ export default function DashboardHome() {
 
     </div>
   );
-}
+});
+
+export default DashboardHome;
