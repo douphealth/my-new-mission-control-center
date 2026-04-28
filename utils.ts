@@ -2030,11 +2030,23 @@ Return empty products array ONLY if there are truly no identifiable products in 
 
 /**
  * Analyze content and find monetizable products - SOTA Multi-Phase Detection
+ *
+ * Options:
+ *  - onProgress: receives ScanProgressEvent updates so the UI can show how
+ *    many SerpAPI calls have been used and why candidates were skipped.
+ *  - budgetOverride: hard override for the SerpAPI call budget. Falls back to
+ *    AppConfig.serpApiCallBudget, then DEFAULT_SERPAPI_CALL_BUDGET.
  */
+export interface AnalyzeContentOptions {
+  onProgress?: ScanProgressHandler;
+  budgetOverride?: number;
+}
+
 export const analyzeContentAndFindProduct = async (
   title: string,
   content: string,
-  config: AppConfig
+  config: AppConfig,
+  options: AnalyzeContentOptions = {},
 ): Promise<AnalysisResult> => {
   const contentHash = hashString(`${title}_${content.substring(0, 500)}_${content.length}_v2`);
 
@@ -2045,6 +2057,16 @@ export const analyzeContentAndFindProduct = async (
       comparison: cached.comparison,
       contentType: 'cached',
       monetizationPotential: 'medium',
+      scanReport: {
+        serpApiCallsUsed: 0,
+        serpApiCallBudget: 0,
+        budgetExhausted: false,
+        serpApiRetries: 0,
+        candidatesEvaluated: cached.products.length,
+        productsKept: cached.products.length,
+        skipped: [],
+        stages: [{ name: 'cache_hit', durationMs: 0 }],
+      },
     };
   }
 
@@ -2059,6 +2081,18 @@ export const analyzeContentAndFindProduct = async (
   const phase1Products = extractProductsPhase1(truncatedContent, cleanContent);
   const lookupBudget = estimateLookupBudget(truncatedContent, phase1Products.length);
 
+  // Resolve SerpAPI budget — config-driven with sane defaults.
+  const callBudget =
+    typeof options.budgetOverride === 'number' && options.budgetOverride > 0
+      ? Math.floor(options.budgetOverride)
+      : resolveSerpApiBudget(config, lookupBudget);
+  const minScore = resolveMinCandidateScore(config);
+  const tracker = new BudgetTracker(callBudget, options.onProgress);
+  tracker.startStage(
+    'init',
+    `Budget: ${callBudget} SerpAPI calls · ${phase1Products.length} candidates detected`,
+  );
+
   // Check for SerpAPI key
   if (!config.serpApiKey || config.serpApiKey.trim().length === 0) {
     throw new Error('SerpAPI key is required for product detection. Add it in Settings > Amazon.');
@@ -2066,14 +2100,48 @@ export const analyzeContentAndFindProduct = async (
 
   // Fast path: use the strongest phase-1 signals first, but stay within a strict lookup budget.
   if (phase1Products.length > 0 && config.serpApiKey) {
+    tracker.startStage('phase1_lookup', 'Verifying high-confidence candidates against Amazon');
     const quickProducts: ProductDetails[] = [];
+    // Smart selection: keep only candidates above the score threshold,
+    // sorted by (confidence + ASIN-bonus). Cap to whatever the budget can
+    // actually afford; never queue more candidates than calls available.
     const prioritizedPhase1 = [...phase1Products]
-      .sort((a, b) => (b.confidence - a.confidence) || Number(Boolean(b.asin)) - Number(Boolean(a.asin)))
-      .slice(0, Math.min(phase1Products.length, Math.max(lookupBudget * 2, MAX_PHASE1_LOOKUPS)));
-    const maxPhase1 = prioritizedPhase1.length;
+      .map((p) => ({
+        ...p,
+        score: p.confidence + (p.asin ? 25 : 0),
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    for (const candidate of prioritizedPhase1) {
+      if (candidate.score < minScore && !candidate.asin) {
+        tracker.skip(candidate.name, 'low_score', `score ${candidate.score} < min ${minScore}`, candidate.confidence);
+      }
+    }
+
+    const eligible = prioritizedPhase1.filter((p) => p.score >= minScore || p.asin);
+    const maxPhase1 = Math.min(
+      eligible.length,
+      Math.max(lookupBudget * 2, MAX_PHASE1_LOOKUPS),
+      callBudget, // never plan more candidates than calls available
+    );
     let lastSerpError: string | null = null;
     let serpErrorCount = 0;
     let hasFatalSerpError = false;
+
+    for (let i = 0; i < maxPhase1; i++) {
+      if (tracker.budgetExhausted || !tracker.canSpend()) {
+        for (let j = i; j < maxPhase1; j++) {
+          tracker.skip(eligible[j].name, 'budget_exhausted', `budget ${callBudget} reached`);
+        }
+        break;
+      }
+
+      const p1 = eligible[i];
+      tracker.countCandidate();
+      if (quickProducts.length >= lookupBudget) {
+        tracker.skip(p1.name, 'duplicate', `placement budget ${lookupBudget} filled`);
+        continue;
+      }
 
     for (let i = 0; i < maxPhase1; i++) {
       const p1 = prioritizedPhase1[i];
