@@ -4,6 +4,7 @@ import {
   useRouter,
   Link,
 } from '@tanstack/react-router';
+import { useEffect } from 'react';
 import { useAuth } from '../lib/auth';
 
 export const Route = createFileRoute('/dashboard')({
@@ -14,6 +15,12 @@ function DashboardChrome() {
   const { user, signOut, loading, session } = useAuth();
   const router = useRouter();
 
+  useEffect(() => {
+    if (!loading && !session) {
+      router.navigate({ to: '/login' });
+    }
+  }, [loading, router, session]);
+
   if (loading) {
     return (
       <div className="min-h-dvh bg-dark-950 flex items-center justify-center text-gray-400">
@@ -23,7 +30,6 @@ function DashboardChrome() {
   }
 
   if (!session) {
-    router.navigate({ to: '/login' });
     return null;
   }
 
