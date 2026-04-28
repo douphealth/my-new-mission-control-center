@@ -16,6 +16,18 @@ export const Route = createFileRoute('/dashboard/sites')({
     meta: [{ title: 'WordPress Sites — AmzWP Automator' }],
   }),
   component: SitesPage,
+  errorComponent: ({ error, reset }) => (
+    <div className="bg-dark-900 border border-red-500/30 rounded-2xl p-8 text-center">
+      <h2 className="text-xl font-black mb-2">Couldn't load sites</h2>
+      <p className="text-gray-400 text-sm mb-5">{error.message}</p>
+      <button
+        onClick={reset}
+        className="bg-white text-dark-950 px-5 py-2.5 rounded-xl font-bold hover:bg-brand-400 hover:text-white transition"
+      >
+        Retry
+      </button>
+    </div>
+  ),
 });
 
 function SitesPage() {
