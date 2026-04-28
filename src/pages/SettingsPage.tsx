@@ -1,5 +1,5 @@
 import { useDashboard } from "@/contexts/DashboardContext";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, forwardRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Moon, Sun, Download, Upload, Trash2, AlertTriangle, Database, Palette,
@@ -34,7 +34,7 @@ const themes = [
   { id: "system", label: "System", icon: Monitor },
 ];
 
-function CopyButton({ text }: { text: string }) {
+const CopyButton = forwardRef<HTMLButtonElement, { text: string }>(function CopyButton({ text }, ref) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
     navigator.clipboard.writeText(text);
@@ -42,11 +42,11 @@ function CopyButton({ text }: { text: string }) {
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <button onClick={copy} className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground">
+    <button ref={ref} onClick={copy} className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground">
       {copied ? <CheckCircle2 size={13} className="text-emerald-500" /> : <Copy size={13} />}
     </button>
   );
-}
+});
 
 export default function SettingsPage() {
   const { userName, userRole, theme, setTheme, toggleTheme, updateData, exportAllData, importAllData } = useDashboard();
