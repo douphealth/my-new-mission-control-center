@@ -19,6 +19,10 @@ export default function StatusBar() {
   useEffect(() => {
     let cancelled = false;
     const check = async () => {
+      if (!navigator.onLine) {
+        if (!cancelled) setCloudHealthy(false);
+        return;
+      }
       const config = getSupabaseConfig();
       if (!config) {
         if (!cancelled) setCloudHealthy(false);
