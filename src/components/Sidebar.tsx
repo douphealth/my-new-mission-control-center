@@ -239,7 +239,7 @@ export default function Sidebar() {
             <div>
               {!isCollapsed && (
                 <div className="flex items-center justify-between px-3 mb-1.5">
-                  <span className="text-[9px] font-bold tracking-[0.15em] text-muted-foreground/30 uppercase">CUSTOM</span>
+                  <span className="text-[9px] font-bold tracking-[0.15em] text-sidebar-foreground/35 uppercase">CUSTOM</span>
                 </div>
               )}
               <div className="space-y-0.5">
@@ -249,8 +249,8 @@ export default function Sidebar() {
                     whileTap={{ scale: 0.97 }}
                     className={`w-full flex items-center gap-3 px-3 py-2 text-[13px] font-medium transition-all duration-200
                       ${isCollapsed ? 'justify-center px-0 rounded-xl' : 'rounded-xl'}
-                      ${activeSection === `custom-${mod.id}` ? 'bg-primary text-primary-foreground shadow-lg' : 'text-muted-foreground hover:bg-secondary/50'}`}
-                    style={activeSection === `custom-${mod.id}` ? { boxShadow: '0 4px 16px -3px hsl(var(--primary) / 0.35)' } : undefined}
+                      ${activeSection === `custom-${mod.id}` ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-lg ring-1 ring-sidebar-primary/35' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground'}`}
+                    style={activeSection === `custom-${mod.id}` ? { boxShadow: '0 12px 30px -18px hsl(var(--sidebar-primary) / 0.9)' } : undefined}
                     title={isCollapsed ? mod.name : undefined}>
                     <span className="text-sm">{mod.icon}</span>
                     {!isCollapsed && <span className="flex-1 text-left truncate">{mod.name}</span>}
@@ -266,7 +266,7 @@ export default function Sidebar() {
               {addingTo !== 'NEW_CUSTOM' ? (
                 <motion.button onClick={() => setAddingTo('NEW_CUSTOM')}
                   whileHover={{ scale: 1.01 }}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted-foreground/25 hover:text-primary hover:bg-secondary/30 transition-all border border-dashed border-border/20 hover:border-primary/20">
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-sidebar-foreground/35 hover:text-sidebar-primary hover:bg-sidebar-accent/60 transition-all border border-dashed border-sidebar-border/70 hover:border-sidebar-primary/30">
                   <Plus size={15} />
                   <span>Add Custom Module</span>
                 </motion.button>
@@ -294,20 +294,20 @@ export default function Sidebar() {
         </nav>
 
         {/* Bottom — user area */}
-        <div className="border-t border-border/15 p-3 space-y-2">
+        <div className="border-t border-sidebar-border/70 p-3 space-y-2">
           {/* User + Theme */}
           {!isCollapsed && (
-            <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-secondary/20 hover:bg-secondary/30 transition-colors">
+            <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-sidebar-accent/45 hover:bg-sidebar-accent/70 transition-colors ring-1 ring-sidebar-border/50">
               <div className="w-8 h-8 rounded-xl gradient-primary flex items-center justify-center text-primary-foreground text-xs font-bold flex-shrink-0 shadow-sm">
                 {userName.charAt(0)}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-xs font-semibold text-foreground truncate">{userName}</div>
-                <div className="text-[10px] text-muted-foreground/40 truncate">{userRole}</div>
+                <div className="text-xs font-semibold text-sidebar-foreground truncate">{userName}</div>
+                <div className="text-[10px] text-sidebar-foreground/45 truncate">{userRole}</div>
               </div>
               <button
                 onClick={toggleTheme}
-                className="p-1.5 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-all"
+                className="p-1.5 rounded-lg text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all"
                 title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
               >
                 {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
@@ -318,7 +318,7 @@ export default function Sidebar() {
             <motion.button
               onClick={toggleTheme}
               whileTap={{ scale: 0.95 }}
-              className="w-full flex items-center justify-center py-2.5 rounded-xl text-muted-foreground hover:bg-secondary/50 hover:text-foreground transition-all"
+              className="w-full flex items-center justify-center py-2.5 rounded-xl text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all"
               title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
             >
               {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
