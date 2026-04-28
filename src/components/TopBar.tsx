@@ -72,9 +72,9 @@ const TopBar = forwardRef<HTMLElement>(function TopBar(_props, ref) {
 
   return (
     <>
-      <header ref={ref} className="enterprise-panel sticky top-0 z-30 px-3 sm:px-6 lg:px-8 h-14 sm:h-[72px] flex items-center gap-2 sm:gap-3 border-x-0 border-t-0 rounded-none shadow-none">
+      <header ref={ref} className="mobile-top-glass sm:enterprise-panel sticky top-0 z-30 px-3 sm:px-6 lg:px-8 h-[62px] sm:h-[72px] flex items-center gap-2 sm:gap-3 border-x-0 border-t-0 rounded-none shadow-none">
         {/* Mobile menu */}
-        <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-muted-foreground hover:text-foreground p-2 -ml-1 active:scale-90 transition-transform touch-manipulation">
+        <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-muted-foreground hover:text-foreground p-2 -ml-1 rounded-2xl active:scale-90 active:bg-secondary/70 transition-all touch-manipulation">
           <Menu size={18} />
         </button>
 
@@ -82,7 +82,7 @@ const TopBar = forwardRef<HTMLElement>(function TopBar(_props, ref) {
         <motion.button
           onClick={() => setCommandPaletteOpen(true)}
           whileTap={{ scale: 0.98 }}
-          className="flex items-center gap-2 sm:gap-2.5 flex-1 max-w-xl h-9 sm:h-11 px-3 sm:px-4 rounded-xl sm:rounded-2xl bg-background/55 border border-border/55 hover:border-primary/35 hover:bg-card/80 hover:shadow-[var(--shadow-glow)] transition-all duration-300 cursor-pointer group touch-manipulation"
+          className="flex items-center gap-2 sm:gap-2.5 flex-1 max-w-xl h-10 sm:h-11 px-3 sm:px-4 rounded-2xl bg-card/62 border border-border/50 hover:border-primary/35 hover:bg-card/80 hover:shadow-[var(--shadow-glow)] transition-all duration-300 cursor-pointer group touch-manipulation"
         >
           <Search size={14} className="text-muted-foreground/40 group-hover:text-primary transition-colors flex-shrink-0 sm:w-4 sm:h-4" />
           <span className="text-xs sm:text-sm text-muted-foreground/40 flex-1 text-left truncate">Search...</span>
@@ -114,7 +114,7 @@ const TopBar = forwardRef<HTMLElement>(function TopBar(_props, ref) {
           {/* Notifications */}
           <motion.button
             whileTap={{ scale: 0.9 }}
-            className="relative flex items-center justify-center w-9 sm:w-10 h-9 sm:h-10 rounded-xl sm:rounded-2xl text-muted-foreground/55 hover:text-foreground hover:bg-secondary/75 hover:shadow-sm transition-all touch-manipulation"
+            className="relative flex items-center justify-center w-10 h-10 rounded-2xl text-muted-foreground/60 hover:text-foreground hover:bg-secondary/75 hover:shadow-sm transition-all touch-manipulation"
           >
             <Bell size={16} className="sm:w-[18px] sm:h-[18px]" />
             {notifCount > 0 && (
@@ -149,7 +149,7 @@ const TopBar = forwardRef<HTMLElement>(function TopBar(_props, ref) {
             <motion.button
               onClick={() => setQuickAddOpen(!quickAddOpen)}
               whileTap={{ scale: 0.88 }}
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl gradient-primary text-primary-foreground flex items-center justify-center shadow-[var(--shadow-primary)] hover:shadow-[0_8px_30px_-6px_hsl(var(--primary)/0.5)] transition-shadow touch-manipulation"
+              className="w-10 h-10 rounded-2xl gradient-primary text-primary-foreground flex items-center justify-center shadow-[var(--shadow-primary)] hover:shadow-[0_8px_30px_-6px_hsl(var(--primary)/0.5)] transition-shadow touch-manipulation"
             >
               <Plus size={16} className={`transition-transform duration-200 ${quickAddOpen ? 'rotate-45' : ''}`} />
             </motion.button>
@@ -163,7 +163,7 @@ const TopBar = forwardRef<HTMLElement>(function TopBar(_props, ref) {
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: -4 }}
                     transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
-                    className="fixed sm:absolute inset-x-3 sm:inset-x-auto bottom-20 sm:bottom-auto sm:right-0 sm:top-full sm:mt-3 z-50 sm:w-60 bg-card/98 backdrop-blur-2xl rounded-3xl shadow-[var(--shadow-xl)] border border-border/40 p-2 overflow-hidden"
+                    className="fixed sm:absolute inset-x-3 sm:inset-x-auto bottom-[92px] sm:bottom-auto sm:right-0 sm:top-full sm:mt-3 z-50 sm:w-60 mobile-sheet-luxe rounded-[28px] p-2 overflow-hidden"
                   >
                     <div className="px-4 py-2.5 text-[10px] font-semibold text-muted-foreground/35 uppercase tracking-widest">Quick Add</div>
                     <div className="grid grid-cols-2 sm:grid-cols-1 gap-0.5">

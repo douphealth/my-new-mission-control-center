@@ -119,8 +119,8 @@ export default function DashboardLayout() {
       </div>
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <TopBar />
-        <main className="flex-1 overflow-y-auto pb-24 lg:pb-0 overscroll-contain">
-          <div className="max-w-[1680px] mx-auto p-3 sm:p-5 lg:p-7 xl:p-9">
+        <main className="flex-1 overflow-y-auto pb-28 lg:pb-0 overscroll-contain">
+          <div className="max-w-[1680px] mx-auto px-3 pb-5 pt-3 sm:p-5 lg:p-7 xl:p-9">
             <RouteErrorBoundary sectionName={activeSection} key={activeSection}>
               <Suspense fallback={<LoadingSkeleton />}>
                 <AnimatePresence mode="wait">
