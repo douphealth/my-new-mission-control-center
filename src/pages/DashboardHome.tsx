@@ -1,8 +1,8 @@
 import { useDashboard } from '@/contexts/DashboardContext';
 import { useNavigationStore } from '@/stores/navigationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { forwardRef, useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import {
   Globe, CheckSquare, Clock, Zap, Calendar, FileText, Target, DollarSign,
   Eye, EyeOff, ArrowUpRight, ArrowDownRight, ExternalLink,
@@ -49,9 +49,10 @@ function PillChart({ data, color = 'hsl(150 60% 48%)' }: { data: number[]; color
   );
 }
 
-function WH({ title, sub, action, onAction, light }: { title: string; sub?: string; action?: string; onAction?: () => void; light?: boolean }) {
+const WH = forwardRef<HTMLDivElement, { title: string; sub?: string; action?: string; onAction?: () => void; light?: boolean }>(
+  ({ title, sub, action, onAction, light }, ref) => {
   return (
-    <div className="flex items-start justify-between mb-4 sm:mb-5 flex-shrink-0">
+    <div ref={ref} className="flex items-start justify-between mb-4 sm:mb-5 flex-shrink-0">
       <div>
         <h3 className={`font-bold text-[13px] sm:text-[14px] tracking-tight ${light ? 'text-white' : 'text-foreground'}`}>{title}</h3>
         {sub && <p className={`text-[10px] mt-0.5 ${light ? 'text-white/45' : 'text-muted-foreground/50'}`}>{sub}</p>}
@@ -63,7 +64,10 @@ function WH({ title, sub, action, onAction, light }: { title: string; sub?: stri
       )}
     </div>
   );
-}
+  },
+);
+
+WH.displayName = 'WidgetHeader';
 
 /* ─── Main Dashboard ─── */
 export default function DashboardHome() {

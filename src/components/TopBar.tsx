@@ -1,14 +1,19 @@
 import { useDashboard } from '@/contexts/DashboardContext';
 import { useNavigationStore } from '@/stores/navigationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { Search, Bell, Plus, Menu, Upload, Download, Sparkles, Mail } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Search, Bell, Plus, Menu, Download, Mail } from 'lucide-react';
+import { lazy, Suspense, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import CommandPalette from './CommandPalette';
-import BulkImportModal from './BulkImportModal';
+
+const CommandPalette = lazy(() => import('./CommandPalette'));
+const BulkImportModal = lazy(() => import('./BulkImportModal'));
 
 function formatDate() {
   return new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function DeferredOverlayFallback() {
+  return null;
 }
 
 const quickAddItems = [
@@ -193,8 +198,12 @@ export default function TopBar() {
         </div>
       </header>
 
-      <CommandPalette open={commandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} onImport={() => setImportModalOpen(true)} />
-      <BulkImportModal open={importModalOpen} onClose={() => setImportModalOpen(false)} />
+      <Suspense fallback={<DeferredOverlayFallback />}>
+        {commandPaletteOpen && (
+          <CommandPalette open={commandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} onImport={() => setImportModalOpen(true)} />
+        )}
+        {importModalOpen && <BulkImportModal open={importModalOpen} onClose={() => setImportModalOpen(false)} />}
+      </Suspense>
     </>
   );
 }
