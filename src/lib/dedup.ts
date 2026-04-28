@@ -30,6 +30,21 @@ function fpWebsite(item: Partial<Website>): string {
     return `w|${normUrl(item.url)}|${norm(item.name)}`;
 }
 
+function hasMeaningfulFingerprint(tableName: string, item: any): boolean {
+    switch (tableName) {
+        case 'websites':
+            return Boolean(normUrl(item?.url) || norm(item?.name));
+        case 'links':
+            return Boolean(normUrl(item?.url) || norm(item?.title));
+        case 'repos':
+            return Boolean(normUrl(item?.url) || norm(item?.name));
+        case 'credentials':
+            return Boolean(norm(item?.label) || norm(item?.service) || normUrl(item?.url));
+        default:
+            return true;
+    }
+}
+
 function fpTask(item: Partial<Task>): string {
     // Include dueDate in fingerprint — two tasks with the same title on the same date are duplicates
     return `t|${norm(item.title)}|${norm(item.dueDate)}|${norm(item.category)}|${norm(item.linkedProject)}`;
@@ -125,6 +140,10 @@ export async function deduplicateItems<T>(tableName: string, items: T[]): Promis
     const unique: T[] = [];
 
     for (const item of items) {
+        if (!hasMeaningfulFingerprint(tableName, item)) {
+            unique.push(item);
+            continue;
+        }
         const hash = fp(item);
         if (!existing.has(hash) && !seen.has(hash)) {
             seen.add(hash);
@@ -141,6 +160,7 @@ export async function deduplicateItems<T>(tableName: string, items: T[]): Promis
 export async function isDuplicate(tableName: string, item: any): Promise<boolean> {
     const fp = FINGERPRINT_MAP[tableName];
     if (!fp) return false;
+    if (!hasMeaningfulFingerprint(tableName, item)) return false;
 
     const existing = await getExistingFingerprints(tableName);
     return existing.has(fp(item));
