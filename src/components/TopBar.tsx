@@ -2,7 +2,7 @@ import { useDashboard } from '@/contexts/DashboardContext';
 import { useNavigationStore } from '@/stores/navigationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { Search, Bell, Plus, Menu, Download, Mail } from 'lucide-react';
-import { lazy, Suspense, useState, useEffect } from 'react';
+import { forwardRef, lazy, Suspense, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const CommandPalette = lazy(() => import('./CommandPalette'));
@@ -29,7 +29,7 @@ const quickAddItems = [
   { id: 'credentials', label: 'Credential', emoji: '🔐' },
 ];
 
-export default function TopBar() {
+const TopBar = forwardRef<HTMLElement>(function TopBar(_props, ref) {
   const { tasks, exportAllData } = useDashboard();
   const { userName } = useSettingsStore();
   const { setSidebarOpen, setActiveSection, commandPaletteOpen, setCommandPaletteOpen, importModalOpen, setImportModalOpen } = useNavigationStore();
@@ -72,7 +72,7 @@ export default function TopBar() {
 
   return (
     <>
-      <header className="sticky top-0 z-30 bg-card/80 backdrop-blur-2xl border-b border-border/15 px-3 sm:px-6 lg:px-8 h-14 sm:h-[72px] flex items-center gap-2 sm:gap-3">
+      <header ref={ref} className="sticky top-0 z-30 bg-card/80 backdrop-blur-2xl border-b border-border/15 px-3 sm:px-6 lg:px-8 h-14 sm:h-[72px] flex items-center gap-2 sm:gap-3">
         {/* Mobile menu */}
         <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-muted-foreground hover:text-foreground p-2 -ml-1 active:scale-90 transition-transform touch-manipulation">
           <Menu size={18} />
@@ -206,4 +206,6 @@ export default function TopBar() {
       </Suspense>
     </>
   );
-}
+});
+
+export default TopBar;
