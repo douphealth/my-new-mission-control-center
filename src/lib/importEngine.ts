@@ -592,6 +592,42 @@ function detectAndTranspose(rows: Record<string, string>[], sourceFields: string
   return transposed.length > 0 ? transposed : null;
 }
 
+function splitMatrixLine(line: string): string[] {
+  if (line.includes('\t')) return line.split('\t').map(c => c.trim()).filter(Boolean);
+  return line.split(/ {2,}/).map(c => c.trim()).filter(Boolean);
+}
+
+function parseTransposedMatrix(text: string): { rows: Record<string, string>[]; fields: string[] } | null {
+  const matrix = text.split('\n').map(l => splitMatrixLine(l)).filter(cells => cells.length >= 2);
+  if (matrix.length < 2) return null;
+
+  const aliases = new Set<string>();
+  for (const meta of Object.values(TARGET_META)) {
+    for (const field of [...meta.requiredFields, ...meta.optionalFields]) {
+      aliases.add(normalize(field));
+      for (const alias of meta.aliases[field] || []) aliases.add(normalize(alias));
+    }
+  }
+
+  const labeledRows = matrix.filter(cells => aliases.has(normalize(cells[0])));
+  const maxCols = Math.max(...matrix.map(cells => cells.length));
+  if (labeledRows.length < Math.max(2, matrix.length * 0.45) || maxCols < 3) return null;
+
+  const rows: Record<string, string>[] = [];
+  for (let col = 1; col < maxCols; col++) {
+    const record: Record<string, string> = {};
+    for (const cells of matrix) {
+      const key = cells[0]?.trim();
+      const value = cells[col]?.trim();
+      if (key && value) record[key] = value;
+    }
+    if (Object.keys(record).length > 0) rows.push(record);
+  }
+
+  const fields = [...new Set(rows.flatMap(row => Object.keys(row)))];
+  return rows.length > 0 ? { rows, fields } : null;
+}
+
 export function parseImportData(text: string, fileName?: string): ParsedData {
   const trimmed = text.trim();
 
@@ -605,6 +641,12 @@ export function parseImportData(text: string, fileName?: string): ParsedData {
   const mdResult = parseMarkdownTable(trimmed);
   if (mdResult && mdResult.rows.length > 0) {
     return { rows: mdResult.rows, sourceFields: mdResult.fields, detectedFormat: 'markdown' };
+  }
+
+  // 0c. Try transposed spreadsheet-style paste: Field\tItem1\tItem2...
+  const matrixResult = parseTransposedMatrix(trimmed);
+  if (matrixResult && matrixResult.rows.length > 0) {
+    return { rows: matrixResult.rows, sourceFields: matrixResult.fields, detectedFormat: 'tsv' };
   }
 
   // 1. Try JSON
@@ -1038,6 +1080,14 @@ export function autoMapFields(sourceFields: string[], target: ImportTarget): Rec
 
 // ─── Normalization ────────────────────────────────────────────────────────────
 
+function normalizeWebsiteStatus(value: string): 'active' | 'maintenance' | 'down' | 'archived' {
+  const v = normalize(value || 'active');
+  if (['maintenance', 'maint', 'updating'].includes(v)) return 'maintenance';
+  if (['down', 'offline', 'outage', 'inactive'].includes(v)) return 'down';
+  if (['archived', 'archive', 'retired'].includes(v)) return 'archived';
+  return 'active';
+}
+
 export function normalizeItems(
   rows: Record<string, string>[],
   target: ImportTarget,
@@ -1100,12 +1150,16 @@ export function normalizeItems(
         if (!url && URL_REGEX.test(name)) { url = name; name = nameFromUrl(url); }
         URL_REGEX.lastIndex = 0;
         if (url && !url.startsWith('http')) url = 'https://' + url;
+        let wpAdminUrl = get(row, 'wpAdminUrl');
+        let hostingLoginUrl = get(row, 'hostingLoginUrl');
+        if (wpAdminUrl && !wpAdminUrl.startsWith('http')) wpAdminUrl = 'https://' + wpAdminUrl;
+        if (hostingLoginUrl && !hostingLoginUrl.startsWith('http')) hostingLoginUrl = 'https://' + hostingLoginUrl;
         return {
           name, url,
-          wpAdminUrl: get(row, 'wpAdminUrl'), wpUsername: get(row, 'wpUsername'), wpPassword: get(row, 'wpPassword'),
-          hostingProvider: get(row, 'hostingProvider'), hostingLoginUrl: get(row, 'hostingLoginUrl'),
+          wpAdminUrl, wpUsername: get(row, 'wpUsername'), wpPassword: get(row, 'wpPassword'),
+          hostingProvider: get(row, 'hostingProvider'), hostingLoginUrl,
           hostingUsername: get(row, 'hostingUsername'), hostingPassword: get(row, 'hostingPassword'),
-          category: get(row, 'category') || 'Personal', status: get(row, 'status') || 'active',
+          category: get(row, 'category') || 'Personal', status: normalizeWebsiteStatus(get(row, 'status')),
           notes: get(row, 'notes'), plugins: toArray(get(row, 'plugins')),
           tags: toArray(get(row, 'tags')), dateAdded: now, lastUpdated: now,
         };
