@@ -408,7 +408,10 @@ interface AnalysisResult {
   monetizationPotential: 'high' | 'medium' | 'low';
   keywords?: string[];
   suggestedPlacements?: number[];
+  scanReport?: import('./types').ScanReport;
 }
+
+import type { ScanReport, SkippedCandidate, SkipReason } from './types';
 
 interface ConnectionTestResult {
   success: boolean;
