@@ -161,9 +161,24 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     background-image: var(--gradient-mesh);
+    background-attachment: fixed;
     min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0.34;
+    background-image:
+      linear-gradient(hsl(var(--foreground) / 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--foreground) / 0.025) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: linear-gradient(to bottom, black 0%, transparent 78%);
   }
 
   ::-webkit-scrollbar {
@@ -286,6 +301,24 @@
 
   .card-glass:hover {
     box-shadow: var(--shadow-lg);
+  }
+
+  .enterprise-shell {
+    background: var(--gradient-mesh);
+  }
+
+  .enterprise-panel {
+    background: var(--surface-panel);
+    border: var(--hairline);
+    box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(28px) saturate(1.35);
+    -webkit-backdrop-filter: blur(28px) saturate(1.35);
+  }
+
+  .enterprise-card {
+    background: var(--surface-raised);
+    border: var(--hairline);
+    box-shadow: var(--shadow-sm);
   }
 
   /* ─── Gradient utilities ─── */
