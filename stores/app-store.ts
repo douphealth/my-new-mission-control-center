@@ -2,6 +2,12 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { AppConfig, AppStep, BlogPost, SitemapState } from '../types';
 
+const noopStorage = {
+  getItem: () => null,
+  setItem: () => undefined,
+  removeItem: () => undefined,
+};
+
 const DEFAULT_CONFIG: AppConfig = {
   amazonTag: '',
   amazonAccessKey: '',
@@ -52,7 +58,9 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'amzwp-store-v1',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() =>
+        typeof window !== 'undefined' ? window.localStorage : noopStorage
+      ),
       partialize: (state) => ({
         hasEntered: state.hasEntered,
         config: state.config,
