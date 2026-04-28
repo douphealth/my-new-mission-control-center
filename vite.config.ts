@@ -7,7 +7,7 @@ import { componentTagger } from "lovable-tagger";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const plugins = [
-    ...tanstackStart(),
+    ...tanstackStart({ client: { entry: "client" } }),
     react(),
     ...(mode === "development" ? [componentTagger()] : []),
   ] as any;
