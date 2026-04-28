@@ -5,7 +5,7 @@ import {
   useRouter,
   Link,
 } from '@tanstack/react-router';
-import { useAuth, AuthProvider } from '../lib/auth';
+import { useAuth } from '../lib/auth';
 import { supabase } from '../integrations/supabase/client';
 
 export const Route = createFileRoute('/dashboard')({
@@ -15,16 +15,8 @@ export const Route = createFileRoute('/dashboard')({
       throw redirect({ to: '/login' });
     }
   },
-  component: DashboardLayout,
+  component: DashboardChrome,
 });
-
-function DashboardLayout() {
-  return (
-    <AuthProvider>
-      <DashboardChrome />
-    </AuthProvider>
-  );
-}
 
 function DashboardChrome() {
   const { user, signOut } = useAuth();
