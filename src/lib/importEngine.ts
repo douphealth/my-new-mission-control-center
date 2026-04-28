@@ -1142,12 +1142,16 @@ export function normalizeItems(
         if (!url && URL_REGEX.test(name)) { url = name; name = nameFromUrl(url); }
         URL_REGEX.lastIndex = 0;
         if (url && !url.startsWith('http')) url = 'https://' + url;
+        let wpAdminUrl = get(row, 'wpAdminUrl');
+        let hostingLoginUrl = get(row, 'hostingLoginUrl');
+        if (wpAdminUrl && !wpAdminUrl.startsWith('http')) wpAdminUrl = 'https://' + wpAdminUrl;
+        if (hostingLoginUrl && !hostingLoginUrl.startsWith('http')) hostingLoginUrl = 'https://' + hostingLoginUrl;
         return {
           name, url,
-          wpAdminUrl: get(row, 'wpAdminUrl'), wpUsername: get(row, 'wpUsername'), wpPassword: get(row, 'wpPassword'),
-          hostingProvider: get(row, 'hostingProvider'), hostingLoginUrl: get(row, 'hostingLoginUrl'),
+          wpAdminUrl, wpUsername: get(row, 'wpUsername'), wpPassword: get(row, 'wpPassword'),
+          hostingProvider: get(row, 'hostingProvider'), hostingLoginUrl,
           hostingUsername: get(row, 'hostingUsername'), hostingPassword: get(row, 'hostingPassword'),
-          category: get(row, 'category') || 'Personal', status: get(row, 'status') || 'active',
+          category: get(row, 'category') || 'Personal', status: normalizeWebsiteStatus(get(row, 'status')),
           notes: get(row, 'notes'), plugins: toArray(get(row, 'plugins')),
           tags: toArray(get(row, 'tags')), dateAdded: now, lastUpdated: now,
         };
