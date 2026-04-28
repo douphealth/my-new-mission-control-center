@@ -113,26 +113,26 @@ const DashboardHome = forwardRef<HTMLDivElement>(function DashboardHome(_, ref) 
   const taskBar = [3, 5, 4, 7, 6, 8, open.length];
 
   /* shared card style */
-  const card = 'rounded-2xl sm:rounded-3xl border border-border/35 bg-card shadow-sm transition-all duration-300 hover:shadow-md hover:border-border/55 overflow-hidden';
+  const card = 'enterprise-card rounded-2xl sm:rounded-3xl transition-all duration-300 hover:shadow-md hover:border-primary/20 overflow-hidden';
   const darkCard = 'rounded-2xl sm:rounded-3xl overflow-hidden';
 
   return (
     <div ref={ref} className="flex flex-col gap-3 sm:gap-5">
 
       {/* ── Page header ── */}
-      <motion.div {...fu(0)} className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4">
+      <motion.div {...fu(0)} className="enterprise-panel rounded-2xl sm:rounded-3xl p-4 sm:p-6 flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4">
         <div>
           <div className="flex items-center gap-2 sm:gap-3 mb-1">
             <h1 className="text-xl sm:text-3xl font-extrabold text-foreground tracking-tighter">Mission Control</h1>
             <motion.span
               animate={{ opacity: [1, 0.5, 1] }}
               transition={{ duration: 2, repeat: Infinity }}
-              className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-bold border"
+              className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-bold border shadow-sm"
               style={{ background: 'hsl(var(--success)/0.1)', color: 'hsl(var(--success))', borderColor: 'hsl(var(--success)/0.2)' }}>
               ● Live
             </motion.span>
           </div>
-          <p className="text-[12px] sm:text-[13px] text-muted-foreground/50">Welcome back, <strong className="text-foreground/75">{userName}</strong></p>
+          <p className="text-[12px] sm:text-[13px] text-muted-foreground/70">Welcome back, <strong className="text-foreground/85">{userName}</strong></p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {completedToday > 0 && (
@@ -163,10 +163,10 @@ const DashboardHome = forwardRef<HTMLDivElement>(function DashboardHome(_, ref) 
           <motion.div key={s.label} {...fu(i)} whileHover={{ y: -3 }} onClick={() => setActiveSection(s.nav)}
             className="relative overflow-hidden cursor-pointer p-4 sm:p-7 flex flex-col gap-3 sm:gap-5 touch-manipulation"
             style={{
-              borderRadius: 'var(--radius)',
-              background: s.isHero ? 'linear-gradient(145deg,hsl(150 52% 24%),hsl(150 48% 32%))' : 'hsl(var(--card))',
-              boxShadow: s.isHero ? '0 8px 32px -6px hsl(150 52% 26% / 0.45)' : 'var(--shadow-sm)',
-              border: s.isHero ? 'none' : '1px solid hsl(var(--border)/0.4)',
+              borderRadius: 'calc(var(--radius) + 8px)',
+              background: s.isHero ? 'var(--gradient-primary)' : 'var(--surface-raised)',
+              boxShadow: s.isHero ? 'var(--shadow-primary)' : 'var(--shadow-sm)',
+              border: s.isHero ? '1px solid hsl(var(--primary) / 0.25)' : 'var(--hairline)',
             }}>
             {s.isHero && <>
               <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle,rgba(255,255,255,0.1),transparent 70%)' }} />
