@@ -3,7 +3,7 @@ import { lazy, Suspense } from 'react';
 
 // The legacy generator (sitemap scanner + post editor) lives in App.tsx and
 // uses a Zustand store with localStorage, so render it client-only.
-const LegacyApp = lazy(() => import('../../App'));
+const LegacyApp = lazy(() => import('@/App'));
 
 export const Route = createFileRoute('/dashboard/generator')({
   head: () => ({
