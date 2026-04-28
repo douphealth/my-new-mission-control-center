@@ -13,6 +13,14 @@ const DEFAULT_SUPABASE_URL = 'https://dszpokkqhrtjutmvcxnh.supabase.co';
 const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_DR3JoohreA2S4Z3akVmICQ_ZZp2DSnW';
 const CLOUD_BASELINE_KEY = 'mc-cloud-baseline-ready';
 
+export function getDefaultSupabaseUrl(): string {
+    return DEFAULT_SUPABASE_URL;
+}
+
+export function getSupabaseProjectHost(): string {
+    return new URL(DEFAULT_SUPABASE_URL).host;
+}
+
 function hasCloudBaseline(): boolean {
     try {
         return localStorage.getItem(CLOUD_BASELINE_KEY) === '1';

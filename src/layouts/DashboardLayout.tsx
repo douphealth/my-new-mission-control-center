@@ -3,7 +3,7 @@ import TopBar from '@/components/TopBar';
 import StatusBar from '@/components/StatusBar';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useDashboard } from '@/contexts/DashboardContext';
+import { DashboardProvider, useDashboardOptional } from '@/contexts/DashboardContext';
 import { useNavigationStore } from '@/stores/navigationStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import React, { lazy, Suspense } from 'react';
@@ -70,7 +70,17 @@ function LoadingSkeleton() {
 }
 
 export default function DashboardLayout() {
-  const { isLoading } = useDashboard();
+  const dashboard = useDashboardOptional();
+
+  if (!dashboard) {
+    return (
+      <DashboardProvider>
+        <DashboardLayout />
+      </DashboardProvider>
+    );
+  }
+
+  const { isLoading } = dashboard;
   const { activeSection } = useNavigationStore();
   const isMobile = useIsMobile();
   const Section = activeSection.startsWith('custom-') ? CustomModulePage : (sectionMap[activeSection] || DashboardHome);

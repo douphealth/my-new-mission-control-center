@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { WifiOff, Database, Cloud, Check, Loader2, AlertCircle } from 'lucide-react';
-import { isSupabaseConnected } from '@/lib/supabase';
+import { getSupabaseProjectHost, isSupabaseConnected, testSupabaseConnection, getSupabaseConfig } from '@/lib/supabase';
 import { onSaveStatus } from '@/stores/dataStore';
 
 export default function StatusBar() {
   const [online, setOnline] = useState(navigator.onLine);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [cloudHealthy, setCloudHealthy] = useState<boolean | null>(null);
 
   useEffect(() => {
     const on = () => setOnline(true);
@@ -13,6 +14,25 @@ export default function StatusBar() {
     window.addEventListener('online', on);
     window.addEventListener('offline', off);
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      const config = getSupabaseConfig();
+      if (!config) {
+        if (!cancelled) setCloudHealthy(false);
+        return;
+      }
+      const result = await testSupabaseConnection(config.url, config.anonKey);
+      if (!cancelled) setCloudHealthy(result.ok);
+    };
+    void check();
+    const interval = window.setInterval(check, 120000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -47,8 +67,8 @@ export default function StatusBar() {
           <Database size={10} /> IndexedDB
         </span>
         {supabaseConnected && (
-          <span className="flex items-center gap-1 text-success/70">
-            <Cloud size={10} /> Cloud
+          <span className={`flex items-center gap-1 ${cloudHealthy === false ? 'text-destructive/70' : 'text-success/70'}`}>
+            <Cloud size={10} /> Supabase · {getSupabaseProjectHost()}
           </span>
         )}
         {saveStatus === 'saving' && (

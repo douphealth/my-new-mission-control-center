@@ -9,7 +9,19 @@ import {
   Flame, ChevronRight, BarChart3, ArrowUp, ArrowDown, X,
   LayoutGrid, ChevronDown, Plus, TrendingUp, Cloud, RefreshCw, Loader2,
 } from 'lucide-react';
-import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
+
+type GCalSummary = { connected: boolean; events: Array<{ id: string; date: string; title: string; color: string; htmlLink?: string; startTime?: string; endTime?: string }> };
+
+function readGCalSummary(): GCalSummary {
+  try {
+    const raw = localStorage.getItem('mc_gcal_config');
+    if (!raw) return { connected: false, events: [] };
+    const cfg = JSON.parse(raw);
+    return { connected: !!(cfg.accessToken && cfg.tokenExpiry && cfg.tokenExpiry > Date.now()), events: [] };
+  } catch {
+    return { connected: false, events: [] };
+  }
+}
 
 /* ─── animation helpers ─── */
 const fe = [0.22, 1, 0.36, 1] as any;
@@ -75,7 +87,7 @@ export default function DashboardHome() {
   const { setActiveSection } = useNavigationStore();
   const { userName } = useSettingsStore();
   const [clock, setClock] = useState(new Date());
-  const gcal = useGoogleCalendar({ autoFetch: true });
+  const [gcal] = useState<GCalSummary>(() => readGCalSummary());
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
   useEffect(() => { const t = setInterval(() => setClock(new Date()), 1000); return () => clearInterval(t); }, []);

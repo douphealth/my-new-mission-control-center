@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef } from 'react';
 import { db, genId, migrateFromLocalStorage } from '@/lib/db';
 import type { Website, Task, GitHubRepo, BuildProject, LinkItem, Note, Payment, Idea, CredentialVault, CustomModule, HabitTracker, UserSettings, WidgetLayout } from '@/lib/db';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -256,7 +256,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const customModules = useLiveQuery(() => db.customModules.toArray(), []) ?? [];
   const habits = useLiveQuery(() => db.habits.toArray(), []) ?? [];
 
-  const value: DashboardContextValue = {
+  const value: DashboardContextValue = useMemo(() => ({
     websites, tasks, repos, buildProjects, links, notes, payments, ideas, credentials, customModules, habits,
     userName, userRole, theme, sidebarCollapsed, dashboardLayout,
     activeSection, setActiveSection, sidebarOpen, setSidebarOpen,
@@ -267,7 +267,17 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     exportAllData, importAllData,
     genId,
     updateData,
-  };
+  }), [
+    websites, tasks, repos, buildProjects, links, notes, payments, ideas, credentials, customModules, habits,
+    userName, userRole, theme, sidebarCollapsed, dashboardLayout,
+    activeSection, setActiveSection, sidebarOpen, setSidebarOpen,
+    toggleTheme, setTheme,
+    addItem, updateItem, deleteItem, duplicateItem, bulkAddItems,
+    updateSettings, saveDashboardLayout,
+    isLoading,
+    exportAllData, importAllData,
+    updateData,
+  ]);
 
   return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>;
 }
@@ -276,4 +286,8 @@ export function useDashboard() {
   const ctx = useContext(DashboardContext);
   if (!ctx) throw new Error('useDashboard must be used within DashboardProvider');
   return ctx;
+}
+
+export function useDashboardOptional() {
+  return useContext(DashboardContext);
 }
