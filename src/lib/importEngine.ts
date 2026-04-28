@@ -1381,6 +1381,19 @@ function tryMultiCategorySplit(rows: Record<string, string>[], sourceFields: str
 
   // Signature-based split: check if different rows match different categories strongly
   if (rows.length >= 3) {
+    const homogeneousDetections = autoDetectWithConfidence(sourceFields, rows);
+    const topDetection = homogeneousDetections[0];
+    const secondDetection = homogeneousDetections[1];
+    const hasStrongSingleCategory = Boolean(
+      topDetection &&
+      topDetection.validCount >= Math.max(2, Math.ceil(rows.length * 0.66)) &&
+      topDetection.score - (secondDetection?.score ?? 0) >= 8
+    );
+
+    if (hasStrongSingleCategory) {
+      return null;
+    }
+
     const rowSignatures = rows.map(row => {
       const values = Object.values(row).join(' ');
       const hasUrl = URL_REGEX.test(values);
