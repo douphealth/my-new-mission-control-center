@@ -87,6 +87,22 @@ interface ScanProgress {
   stage: string;
   current: number;
   total: number;
+  message?: string;
+  serpApiCallsUsed?: number;
+  serpApiCallBudget?: number;
+  candidatesEvaluated?: number;
+  productsKept?: number;
+  skipped?: number;
+}
+
+interface ScanReportSummary {
+  serpApiCallsUsed: number;
+  serpApiCallBudget: number;
+  budgetExhausted: boolean;
+  serpApiRetries: number;
+  productsKept: number;
+  candidatesEvaluated: number;
+  skipped: Array<{ name: string; reason: string; detail?: string }>;
 }
 
 type EditorStatus = 'idle' | 'fetching' | 'analyzing' | 'pushing' | 'error';
@@ -184,6 +200,7 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
   const [manualAsin, setManualAsin] = useState('');
   const [addingProduct, setAddingProduct] = useState(false);
   const [scanProgress, setScanProgress] = useState<ScanProgress | null>(null);
+  const [scanReport, setScanReport] = useState<ScanReportSummary | null>(null);
 
   const prefersReducedMotion = useReducedMotion();
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
