@@ -9,8 +9,6 @@ export default defineConfig(({ mode }) => ({
     tsConfigPaths({ projects: ['./tsconfig.json'] }),
     tailwindcss(),
     tanstackStart({
-      target: 'cloudflare-module',
-      customViteReactPlugin: false,
       tsr: { srcDirectory: 'src' },
     }),
     mode === 'development' && componentTagger(),
