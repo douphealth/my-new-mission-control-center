@@ -306,6 +306,15 @@ const stripHtml = (html: string): string => {
     .trim();
 };
 
+const getWordPressSiteBaseUrl = (input: string): string => {
+  const trimmed = input.trim().replace(/\/$/, '');
+  return trimmed.replace(/\/wp-json(?:\/wp\/v2|\/v2)?$/i, '');
+};
+
+const getWordPressApiBaseUrl = (input: string): string => {
+  return `${getWordPressSiteBaseUrl(input)}/wp-json/wp/v2`;
+};
+
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
 
@@ -498,6 +507,21 @@ function resolveMinCandidateScore(config: AppConfig): number {
     return DEFAULT_SERPAPI_MIN_CANDIDATE_SCORE;
   }
   return Math.max(0, Math.min(100, value));
+}
+
+export function sanitizeAppConfig(config: AppConfig): AppConfig {
+  return {
+    ...config,
+    wpUrl: config.wpUrl ? getWordPressSiteBaseUrl(config.wpUrl) : '',
+    serpApiCallBudget: Math.max(
+      1,
+      Math.min(50, Math.floor(config.serpApiCallBudget ?? DEFAULT_SERPAPI_CALL_BUDGET)),
+    ),
+    serpApiMinCandidateScore: Math.max(
+      0,
+      Math.min(100, Math.floor(config.serpApiMinCandidateScore ?? DEFAULT_SERPAPI_MIN_CANDIDATE_SCORE)),
+    ),
+  };
 }
 
 const upgradeAmazonImageToHighRes = (imageUrl: string): string => {
