@@ -10,7 +10,11 @@ const IV_LENGTH = 12; // 96-bit IV for AES-GCM
 
 function getEncryptionKey(): string {
     try {
-        return localStorage.getItem('mc-encryption-key') || DEFAULT_KEY;
+        const existing = localStorage.getItem('mc-encryption-key');
+        if (existing) return existing;
+        const generated = generateStrongKey();
+        localStorage.setItem('mc-encryption-key', generated);
+        return generated;
     } catch {
         return DEFAULT_KEY;
     }
@@ -95,7 +99,7 @@ export async function encrypt(plainText: string, customKey?: string): Promise<st
         return 'wcapi:' + arrayBufferToBase64(combined.buffer);
     } catch (e) {
         console.error('Encryption failed:', e);
-        return plainText; // Fallback: return plain (same behavior as old lib)
+        throw new Error('Credential encryption failed. Secret was not saved in plaintext.');
     }
 }
 
@@ -113,8 +117,9 @@ export async function decrypt(cipherText: string, customKey?: string): Promise<s
         return cipherText;
     }
 
+    const activeKey = customKey || getEncryptionKey();
     try {
-        const key = await deriveKey(customKey || getEncryptionKey());
+        const key = await deriveKey(activeKey);
         const combined = new Uint8Array(base64ToArrayBuffer(cipherText.slice(6)));
 
         const iv = combined.slice(0, IV_LENGTH);
@@ -128,6 +133,18 @@ export async function decrypt(cipherText: string, customKey?: string): Promise<s
 
         return new TextDecoder().decode(decrypted);
     } catch {
+        if (!customKey && activeKey !== DEFAULT_KEY) {
+            try {
+                const legacyKey = await deriveKey(DEFAULT_KEY);
+                const combined = new Uint8Array(base64ToArrayBuffer(cipherText.slice(6)));
+                const decrypted = await crypto.subtle.decrypt(
+                    { name: ALGORITHM, iv: combined.slice(0, IV_LENGTH) },
+                    legacyKey,
+                    combined.slice(IV_LENGTH)
+                );
+                return new TextDecoder().decode(decrypted);
+            } catch { }
+        }
         return cipherText; // Return original if decryption fails
     }
 }
