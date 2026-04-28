@@ -119,14 +119,19 @@ export default function CredentialsPage() {
 
   const saveForm = async () => {
     if (!form.label.trim()) { toast.error("Label is required"); return; }
-    const encPassword = form.password ? await encrypt(form.password) : "";
-    const encApiKey = form.apiKey ? await encrypt(form.apiKey) : "";
-    const encrypted = { ...form, password: encPassword, apiKey: encApiKey };
-    if (editId) { await updateItem<CredentialVault>("credentials", editId, encrypted); toast.success("Credential updated"); }
-    else {
-      const newId = await addItem<CredentialVault>("credentials", encrypted);
-      if (newId) toast.success("Credential added");
-      else { toast.error("Duplicate credential — already exists"); return; }
+    try {
+      const encPassword = form.password ? await encrypt(form.password) : "";
+      const encApiKey = form.apiKey ? await encrypt(form.apiKey) : "";
+      const encrypted = { ...form, password: encPassword, apiKey: encApiKey };
+      if (editId) { await updateItem<CredentialVault>("credentials", editId, encrypted); toast.success("Credential updated"); }
+      else {
+        const newId = await addItem<CredentialVault>("credentials", encrypted);
+        if (newId) toast.success("Credential added");
+        else { toast.error("Duplicate credential — already exists"); return; }
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Credential encryption failed");
+      return;
     }
     setModalOpen(false);
   };
