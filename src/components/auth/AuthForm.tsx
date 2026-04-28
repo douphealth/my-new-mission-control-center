@@ -20,13 +20,21 @@ export function AuthForm({ mode }: Props) {
     setBusy(true);
     try {
       const fn = mode === 'signin' ? signIn : signUp;
-      const { error } = await fn(email.trim(), password);
+      const { error, session } = await fn(email.trim(), password);
       if (error) {
         toast.error(error.message);
         return;
       }
       if (mode === 'signup') {
-        toast.success('Account created — check your email if confirmation is required.');
+        if (!session) {
+          toast.success('Account created — confirm your email, then sign in.');
+          navigate({ to: '/login' });
+          return;
+        }
+        toast.success('Account created.');
+      } else if (!session) {
+        toast.error('Login did not create a session. Please try again.');
+        return;
       } else {
         toast.success('Welcome back.');
       }
