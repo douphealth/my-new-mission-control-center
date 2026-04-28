@@ -24,6 +24,8 @@ const DEFAULT_CONFIG: AppConfig = {
   boxStyle: 'PREMIUM',
   aiProvider: 'gemini',
   aiModel: 'gemini-2.0-flash',
+  serpApiCallBudget: 8,
+  serpApiMinCandidateScore: 35,
 };
 
 interface AppState {
