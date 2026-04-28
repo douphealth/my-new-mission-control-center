@@ -593,7 +593,7 @@ function detectAndTranspose(rows: Record<string, string>[], sourceFields: string
 }
 
 function splitMatrixLine(line: string): string[] {
-  if (line.includes('\t')) return line.split('\t').map(c => c.trim()).filter(Boolean);
+  if (line.includes('\t')) return line.split('\t').map(c => c.trim());
   return line.split(/ {2,}/).map(c => c.trim()).filter(Boolean);
 }
 
@@ -1146,7 +1146,17 @@ export function normalizeItems(
     switch (target) {
       case 'websites': {
         let url = get(row, 'url') || extractUrl(row);
-        let name = get(row, 'name') || nameFromUrl(url) || 'Unnamed';
+        let name = get(row, 'name') || nameFromUrl(url) || '';
+        const domainLikeName = name.trim().match(/^(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s]*)?$/i);
+        const urlLikeAdmin = get(row, 'wpAdminUrl') || get(row, 'hostingLoginUrl');
+        if (!url && domainLikeName) {
+          url = name.trim();
+        } else if (!url && urlLikeAdmin) {
+          url = urlLikeAdmin;
+        }
+        if (!name) {
+          name = nameFromUrl(url) || 'Unnamed';
+        }
         if (!url && URL_REGEX.test(name)) { url = name; name = nameFromUrl(url); }
         URL_REGEX.lastIndex = 0;
         if (url && !url.startsWith('http')) url = 'https://' + url;
