@@ -2143,41 +2143,57 @@ export const analyzeContentAndFindProduct = async (
         continue;
       }
 
-    for (let i = 0; i < maxPhase1; i++) {
-      const p1 = prioritizedPhase1[i];
-      if (quickProducts.length >= lookupBudget) break;
-
       try {
         let productData: Partial<ProductDetails> = {};
 
         if (p1.asin) {
+          if (!tracker.canSpend()) {
+            tracker.skip(p1.name, 'budget_exhausted', `budget ${callBudget} reached`, p1.confidence);
+            break;
+          }
           try {
-            const result = await fetchProductByASIN(p1.asin, config.serpApiKey);
+            const result = await fetchProductByASIN(p1.asin, config.serpApiKey, tracker);
             if (result) productData = result;
           } catch (e: any) {
             if (e instanceof SerpApiError && e.isFatal) {
               hasFatalSerpError = true;
               lastSerpError = e.message;
+              tracker.skip(p1.name, 'fatal_serpapi', e.message, p1.confidence);
               break;
+            }
+            if (e instanceof SerpApiError && e.statusCode === 429) {
+              tracker.skip(p1.name, 'serpapi_rate_limit', e.message, p1.confidence);
             }
           }
         }
 
         if (!productData.asin) {
           if (!shouldUseSearchQuery(p1.name)) {
+            tracker.skip(p1.name, 'invalid_query', 'query too short for Amazon search', p1.confidence);
             continue;
           }
+          if (!tracker.canSpend()) {
+            tracker.skip(p1.name, 'budget_exhausted', `budget ${callBudget} reached`, p1.confidence);
+            break;
+          }
           try {
-            productData = await searchAmazonProduct(p1.name, config.serpApiKey);
+            productData = await searchAmazonProduct(p1.name, config.serpApiKey, tracker);
           } catch (e: any) {
             if (e instanceof SerpApiError && e.isFatal) {
               hasFatalSerpError = true;
               lastSerpError = e.message;
+              tracker.skip(p1.name, 'fatal_serpapi', e.message, p1.confidence);
               break;
             }
             if (e instanceof SerpApiError) {
               serpErrorCount++;
               lastSerpError = e.message;
+              tracker.skip(
+                p1.name,
+                e.statusCode === 429 ? 'serpapi_rate_limit' : 'serpapi_error',
+                e.message,
+                p1.confidence,
+              );
             }
             continue;
           }
@@ -2207,6 +2223,11 @@ export const analyzeContentAndFindProduct = async (
             specs: {},
             confidence: p1.confidence,
           });
+          tracker.countProductKept();
+        } else if (hasAsin) {
+          tracker.skip(p1.name, 'no_amazon_match', 'matched ASIN but no image/price', p1.confidence);
+        } else {
+          tracker.skip(p1.name, 'no_amazon_match', 'no ASIN returned', p1.confidence);
         }
 
         if (i < maxPhase1 - 1) {
@@ -2216,10 +2237,12 @@ export const analyzeContentAndFindProduct = async (
         if (e instanceof SerpApiError && e.isFatal) {
           hasFatalSerpError = true;
           lastSerpError = e.message;
+          tracker.skip(p1.name, 'fatal_serpapi', e.message, p1.confidence);
           break;
         }
       }
     }
+    tracker.endStage();
 
     if (hasFatalSerpError && lastSerpError) {
       throw new Error(`SerpAPI Error: ${lastSerpError}`);
