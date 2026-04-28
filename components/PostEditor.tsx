@@ -62,6 +62,7 @@ import { sanitizeHtml } from '../lib/sanitize';
 const AUTO_SAVE_INTERVAL_MS = 30_000;
 const AUTO_SAVE_KEY_PREFIX = 'amzwp_autosave_';
 const MIN_GAP_BETWEEN_PRODUCTS = 3;
+const MAX_AUTO_PLACED_PRODUCTS = 4;
 
 // ============================================================================
 // LOCAL TYPES
@@ -443,6 +444,12 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
     const toPlace = getUnplacedProducts();
     if (toPlace.length === 0) { toast('All Assets Already Deployed'); return; }
 
+    const availableSlots = Math.max(0, MAX_AUTO_PLACED_PRODUCTS - editorNodes.filter((n) => n.type === 'PRODUCT').length);
+    if (availableSlots === 0) {
+      toast('Product limit reached for this article. Remove one before adding more.');
+      return;
+    }
+
     let newNodes = [...editorNodes];
     let injected = 0;
 
@@ -462,7 +469,7 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
       const ai = a.paragraphIndex ?? Infinity;
       const bi = b.paragraphIndex ?? Infinity;
       return ai !== bi ? bi - ai : (b.confidence ?? 0) - (a.confidence ?? 0);
-    });
+    }).slice(0, availableSlots);
 
     sorted.forEach((p) => {
       const occupied = getOccupied(newNodes);

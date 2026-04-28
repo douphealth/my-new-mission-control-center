@@ -32,7 +32,6 @@ import {
   BoxStyle
 } from './types';
 import { deduplicateRequest } from './lib/request-dedup';
-import { supabase as _supabaseClient } from './src/integrations/supabase/client';
 
 // ============================================================================
 // CACHE & STORAGE CLASSES
@@ -322,6 +321,15 @@ const CACHE_TTL_SHORT_MS = 60 * 60 * 1000; // 1 hour for volatile data
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 1000;
 const MAX_CONCURRENT_REQUESTS = 10;
+const SERPAPI_BASE_URL = 'https://serpapi.com/search.json';
+const MIN_PRODUCTS_PER_ARTICLE = 1;
+const MAX_PRODUCTS_PER_ARTICLE = 4;
+const MIN_WORDS_PER_PRODUCT = 900;
+const MAX_PHASE1_LOOKUPS = 6;
+const MAX_AI_QUEUE_LOOKUPS = 4;
+const SEARCH_RESULTS_LIMIT = 3;
+const SEARCH_QUERY_MIN_WORDS = 2;
+const SEARCH_QUERY_MAX_WORDS = 5;
 const SITEMAP_FETCH_TIMEOUT_MS = 20000;
 const PAGE_FETCH_TIMEOUT_MS = 15000;
 const API_TIMEOUT_MS = 30000;
@@ -1883,22 +1891,27 @@ export const analyzeContentAndFindProduct = async (
   const contentLower = cleanContent.toLowerCase();
 
   const phase1Products = extractProductsPhase1(truncatedContent, cleanContent);
+  const lookupBudget = estimateLookupBudget(truncatedContent, phase1Products.length);
 
   // Check for SerpAPI key
   if (!config.serpApiKey || config.serpApiKey.trim().length === 0) {
     throw new Error('SerpAPI key is required for product detection. Add it in Settings > Amazon.');
   }
 
-  // AGGRESSIVE: If we have Phase 1 products and SerpAPI, use them directly
+  // Fast path: use the strongest phase-1 signals first, but stay within a strict lookup budget.
   if (phase1Products.length > 0 && config.serpApiKey) {
     const quickProducts: ProductDetails[] = [];
-    const maxPhase1 = Math.min(phase1Products.length, 12);
+    const prioritizedPhase1 = [...phase1Products]
+      .sort((a, b) => (b.confidence - a.confidence) || Number(Boolean(b.asin)) - Number(Boolean(a.asin)))
+      .slice(0, Math.min(phase1Products.length, Math.max(lookupBudget * 2, MAX_PHASE1_LOOKUPS)));
+    const maxPhase1 = prioritizedPhase1.length;
     let lastSerpError: string | null = null;
     let serpErrorCount = 0;
     let hasFatalSerpError = false;
 
     for (let i = 0; i < maxPhase1; i++) {
-      const p1 = phase1Products[i];
+      const p1 = prioritizedPhase1[i];
+      if (quickProducts.length >= lookupBudget) break;
 
       try {
         let productData: Partial<ProductDetails> = {};
@@ -1917,6 +1930,9 @@ export const analyzeContentAndFindProduct = async (
         }
 
         if (!productData.asin) {
+          if (!shouldUseSearchQuery(p1.name)) {
+            continue;
+          }
           try {
             productData = await searchAmazonProduct(p1.name, config.serpApiKey);
           } catch (e: any) {
@@ -1980,9 +1996,10 @@ export const analyzeContentAndFindProduct = async (
     }
 
     if (quickProducts.length > 0) {
+      const refinedQuickProducts = finalizeDetectedProducts(quickProducts, lookupBudget);
       let comparison: ComparisonData | undefined;
-      if (quickProducts.length >= 3) {
-        const productIds = quickProducts.slice(0, 10).map(p => p.id);
+      if (refinedQuickProducts.length >= 3) {
+        const productIds = refinedQuickProducts.slice(0, 10).map(p => p.id);
         comparison = {
           title: `${title} - Product Comparison`,
           productIds,
@@ -1990,12 +2007,12 @@ export const analyzeContentAndFindProduct = async (
         };
       }
 
-      IntelligenceCache.setAnalysis(contentHash, { products: quickProducts, comparison });
+      IntelligenceCache.setAnalysis(contentHash, { products: refinedQuickProducts, comparison });
       return {
-        detectedProducts: quickProducts,
+        detectedProducts: refinedQuickProducts,
         comparison,
         contentType: 'informational',
-        monetizationPotential: quickProducts.length >= 3 ? 'high' : 'medium',
+        monetizationPotential: refinedQuickProducts.length >= 3 ? 'high' : 'medium',
       };
     }
   }
@@ -2076,13 +2093,19 @@ export const analyzeContentAndFindProduct = async (
       }
     }
 
+    const prioritizedQueue = serpApiQueue
+      .filter(({ product }) => shouldUseSearchQuery(product.searchQuery || product.title || ''))
+      .sort((a, b) => (b.product.confidence || 0) - (a.product.confidence || 0))
+      .slice(0, Math.min(lookupBudget, MAX_AI_QUEUE_LOOKUPS));
+
     let serpBatchError: string | null = null;
     let serpBatchFatal = false;
 
     const batchSize = 3;
-    for (let i = 0; i < serpApiQueue.length; i += batchSize) {
+    for (let i = 0; i < prioritizedQueue.length; i += batchSize) {
       if (serpBatchFatal) break;
-      const batch = serpApiQueue.slice(i, i + batchSize);
+      if (products.length >= lookupBudget) break;
+      const batch = prioritizedQueue.slice(i, i + batchSize);
 
       const batchPromises = batch.map(async ({ key, product, asin }) => {
         let productData: Partial<ProductDetails> = {};
@@ -2153,29 +2176,31 @@ export const analyzeContentAndFindProduct = async (
         });
       }
 
-      if (i + batchSize < serpApiQueue.length) {
+      if (i + batchSize < prioritizedQueue.length) {
         await sleep(200);
       }
     }
 
-    if (products.length === 0 && serpBatchFatal && serpBatchError) {
+    const refinedProducts = finalizeDetectedProducts(products, lookupBudget);
+
+    if (refinedProducts.length === 0 && serpBatchFatal && serpBatchError) {
       throw new Error(`SerpAPI Error: ${serpBatchError}`);
     }
 
-    if (products.length === 0 && serpBatchError && validatedProducts.size > 0) {
+    if (refinedProducts.length === 0 && serpBatchError && validatedProducts.size > 0) {
       throw new Error(`Found ${validatedProducts.size} products in content but SerpAPI failed: ${serpBatchError}`);
     }
 
     let comparison: ComparisonData | undefined;
-    if (parsed.comparison?.shouldCreate && products.length >= 2) {
-      const productIds = products.slice(0, 5).map(p => p.id);
+    if (parsed.comparison?.shouldCreate && refinedProducts.length >= 2) {
+      const productIds = refinedProducts.slice(0, 5).map(p => p.id);
       comparison = {
         title: parsed.comparison.title || `Top ${title} Comparison`,
         productIds,
         specs: ['Price', 'Rating', 'Reviews'],
       };
-    } else if (products.length >= 3) {
-      const productIds = products.slice(0, 5).map(p => p.id);
+    } else if (refinedProducts.length >= 3) {
+      const productIds = refinedProducts.slice(0, 5).map(p => p.id);
       comparison = {
         title: `${title} - Product Comparison`,
         productIds,
@@ -2183,13 +2208,13 @@ export const analyzeContentAndFindProduct = async (
       };
     }
 
-    IntelligenceCache.setAnalysis(contentHash, { products, comparison });
+    IntelligenceCache.setAnalysis(contentHash, { products: refinedProducts, comparison });
 
     return {
-      detectedProducts: products,
+      detectedProducts: refinedProducts,
       comparison,
       contentType: parsed.contentType || 'informational',
-      monetizationPotential: products.length >= 3 ? 'high' : products.length > 0 ? 'medium' : 'low',
+      monetizationPotential: refinedProducts.length >= 3 ? 'high' : refinedProducts.length > 0 ? 'medium' : 'low',
       keywords: parsed.suggestedKeywords || [],
     };
 
@@ -2202,7 +2227,8 @@ export const analyzeContentAndFindProduct = async (
       const fallbackProducts: ProductDetails[] = [];
       let fallbackSerpError: string | null = null;
 
-      for (const p1 of phase1Products.slice(0, 8)) {
+      for (const p1 of phase1Products.slice(0, Math.min(Math.max(lookupBudget, 2), MAX_PHASE1_LOOKUPS))) {
+        if (fallbackProducts.length >= lookupBudget) break;
         try {
           let productData: Partial<ProductDetails> = {};
           if (p1.asin) {
@@ -2214,6 +2240,9 @@ export const analyzeContentAndFindProduct = async (
             }
           }
           if (!productData.asin) {
+            if (!shouldUseSearchQuery(p1.name)) {
+              continue;
+            }
             try {
               productData = await searchAmazonProduct(p1.name, config.serpApiKey);
             } catch (e: any) {
@@ -2252,10 +2281,11 @@ export const analyzeContentAndFindProduct = async (
       }
 
       if (fallbackProducts.length > 0) {
+        const refinedFallbackProducts = finalizeDetectedProducts(fallbackProducts, lookupBudget);
         return {
-          detectedProducts: fallbackProducts,
+          detectedProducts: refinedFallbackProducts,
           contentType: 'informational',
-          monetizationPotential: 'medium',
+          monetizationPotential: refinedFallbackProducts.length >= 3 ? 'high' : 'medium',
         };
       }
 
@@ -2475,10 +2505,56 @@ function optimizeSearchQuery(query: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 
-  const stopWords = ['the', 'a', 'an', 'new', 'best', 'top', 'review', 'our', 'my', 'your', 'this', 'that'];
-  const words = optimized.split(' ').filter(w => !stopWords.includes(w.toLowerCase()));
+  const stopWords = ['the', 'a', 'an', 'new', 'best', 'top', 'review', 'our', 'my', 'your', 'this', 'that', 'quick', 'answer', 'key', 'takeaways', 'guide', 'vs'];
+  const words = optimized
+    .split(' ')
+    .map((w) => w.trim())
+    .filter((w) => w.length > 2 && !stopWords.includes(w.toLowerCase()));
 
-  return words.slice(0, 6).join(' ');
+  return words.slice(0, SEARCH_QUERY_MAX_WORDS).join(' ');
+}
+
+function estimateLookupBudget(content: string, phase1Count: number): number {
+  const wordCount = stripHtml(content).split(/\s+/).filter(Boolean).length;
+  const fromLength = Math.max(MIN_PRODUCTS_PER_ARTICLE, Math.ceil(wordCount / MIN_WORDS_PER_PRODUCT));
+  const fromSignals = phase1Count >= 6 ? 3 : phase1Count >= 3 ? 2 : 1;
+  return Math.max(MIN_PRODUCTS_PER_ARTICLE, Math.min(MAX_PRODUCTS_PER_ARTICLE, Math.min(fromLength, fromSignals)));
+}
+
+function shouldUseSearchQuery(query: string): boolean {
+  const optimized = optimizeSearchQuery(query);
+  const words = optimized.split(/\s+/).filter(Boolean);
+  return words.length >= SEARCH_QUERY_MIN_WORDS;
+}
+
+function scoreProductCandidate(product: Partial<ProductDetails>, confidence = 0): number {
+  let score = confidence;
+  if (product.asin) score += 45;
+  if (product.imageUrl) score += 25;
+  if (product.price && product.price !== '$XX.XX' && product.price !== 'See Price') score += 20;
+  if ((product.reviewCount || 0) > 50) score += 10;
+  if ((product.rating || 0) >= 4) score += 8;
+  return score;
+}
+
+function finalizeDetectedProducts(products: ProductDetails[], desiredCount: number): ProductDetails[] {
+  const unique = new Map<string, ProductDetails>();
+
+  for (const product of products) {
+    if (!product?.asin) continue;
+    const existing = unique.get(product.asin);
+    if (!existing || scoreProductCandidate(product, product.confidence) > scoreProductCandidate(existing, existing.confidence)) {
+      unique.set(product.asin, product);
+    }
+  }
+
+  return Array.from(unique.values())
+    .sort((a, b) => scoreProductCandidate(b, b.confidence) - scoreProductCandidate(a, a.confidence))
+    .slice(0, desiredCount)
+    .map((product, index) => ({
+      ...product,
+      insertionIndex: typeof product.paragraphIndex === 'number' ? product.paragraphIndex : index,
+    }));
 }
 
 
@@ -2530,9 +2606,6 @@ class SerpApiError extends Error {
   }
 }
 
-// Uses the project's configured Supabase client (imported at top) — single source of truth
-// for URL + auth, guaranteeing we hit the project where serpapi-proxy is deployed.
-
 const callSerpApiProxy = async (params: {
   type: 'search' | 'product';
   query?: string;
@@ -2545,29 +2618,50 @@ const callSerpApiProxy = async (params: {
 
   let lastError: Error | null = null;
 
+  const url = new URL(SERPAPI_BASE_URL);
+  url.searchParams.set('api_key', params.apiKey.trim());
+  url.searchParams.set('amazon_domain', 'amazon.com');
+
+  if (params.type === 'product') {
+    if (!params.asin?.trim()) {
+      throw new SerpApiError('ASIN is required for product lookup.', 0, true);
+    }
+    url.searchParams.set('engine', 'amazon_product');
+    url.searchParams.set('asin', params.asin.trim());
+  } else {
+    if (!params.query?.trim()) {
+      throw new SerpApiError('Search query is required for Amazon lookup.', 0, true);
+    }
+    url.searchParams.set('engine', 'amazon');
+    url.searchParams.set('k', params.query.trim());
+    url.searchParams.set('num', String(SEARCH_RESULTS_LIMIT));
+  }
+
   // Retry with exponential backoff (max 3 attempts)
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const { data, error } = await _supabaseClient.functions.invoke('serpapi-proxy', {
-        body: params,
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+        },
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
-      if (!error) {
-        // Edge function may return { error: "..." } in body for SerpAPI-side failures
-        if (data && typeof data === 'object' && 'error' in data && data.error) {
-          const status = (data as any).status || 500;
-          if (status === 401 || status === 402 || status === 403) {
-            throw new SerpApiError(String(data.error), status, true);
-          }
-          lastError = new SerpApiError(String(data.error), status, false);
-        } else {
-          return data;
-        }
-      } else {
-        // FunctionsHttpError exposes context.response with the status
-        const status = (error as any)?.context?.response?.status ?? 500;
-        const msg = error.message || `SerpAPI proxy error: ${status}`;
+      let data: any = null;
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
+      }
 
+      if (!response.ok) {
+        const status = response.status;
+        const msg = data?.error || `SerpAPI request failed: ${status}`;
         if (status === 401 || status === 402 || status === 403) {
           throw new SerpApiError(msg, status, true);
         }
@@ -2579,8 +2673,25 @@ const callSerpApiProxy = async (params: {
         }
 
         lastError = new SerpApiError(msg, status, false);
+        continue;
       }
+
+      if (data && typeof data === 'object' && data.error) {
+        const message = String(data.error);
+        const status = Number(data.search_metadata?.status_code || 500);
+        if (status === 401 || status === 402 || status === 403) {
+          throw new SerpApiError(message, status, true);
+        }
+        lastError = new SerpApiError(message, status || 500, false);
+        continue;
+      }
+
+      return data;
     } catch (e: any) {
+      if (e?.name === 'AbortError') {
+        lastError = new SerpApiError('SerpAPI request timed out. Please try again.', 504, false);
+        continue;
+      }
       if (e instanceof SerpApiError && e.isFatal) throw e;
       lastError = e;
     }
@@ -3293,25 +3404,32 @@ const generateTacticalLinkHtml = (
   stars: number,
   tag: string
 ): string => {
+  const priceNote = product.prime ? 'Prime delivery eligible' : 'Current Amazon offer';
   return `
 <!-- AmzWP Tactical Link -->
-<div style="max-width:900px;margin:2rem auto;padding:1.5rem;background:linear-gradient(135deg,#fff,#f8fafc);border:1px solid #e2e8f0;border-radius:1.5rem;display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;box-shadow:0 10px 40px rgba(0,0,0,0.08);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<div style="max-width:920px;margin:2rem auto;padding:1.25rem;background:linear-gradient(135deg,#ffffff,#f8fafc 45%,#eef6ff);border:1px solid #dbeafe;border-radius:1.5rem;display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap;box-shadow:0 20px 48px rgba(15,23,42,0.08);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;position:relative;overflow:hidden;">
+  <div style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(59,130,246,0.05),rgba(255,255,255,0));pointer-events:none;"></div>
   <div style="position:relative;">
-    <img src="${product.imageUrl}" alt="${product.title}" style="width:100px;height:100px;object-fit:contain;background:#fff;border-radius:1rem;padding:0.5rem;border:1px solid #e2e8f0;">
-    ${product.prime ? '<div style="position:absolute;bottom:-5px;left:50%;transform:translateX(-50%);background:#232f3e;color:#fff;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;">✓ Prime</div>' : ''}
+    <img src="${product.imageUrl}" alt="${product.title}" style="width:100px;height:100px;object-fit:contain;background:#fff;border-radius:1rem;padding:0.5rem;border:1px solid #e2e8f0;box-shadow:0 12px 28px rgba(15,23,42,0.08);">
+    ${product.prime ? '<div style="position:absolute;bottom:-5px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:3px 9px;border-radius:999px;font-size:9px;font-weight:700;">✓ Prime</div>' : ''}
   </div>
   <div style="flex:1;min-width:200px;">
-    <div style="font-size:10px;color:#3b82f6;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">⭐ Top Rated</div>
-    <h4 style="margin:0;font-size:1.1rem;font-weight:800;color:#1e293b;line-height:1.3;">${product.title}</h4>
-    <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+      <span style="font-size:10px;color:#2563eb;font-weight:800;text-transform:uppercase;letter-spacing:0.14em;">Editor’s pick</span>
+      <span style="font-size:10px;color:#64748b;font-weight:700;">${product.brand || 'Amazon Favorite'}</span>
+    </div>
+    <h4 style="margin:0;font-size:1.05rem;font-weight:800;color:#0f172a;line-height:1.35;">${product.title}</h4>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;">
       <span style="color:#f59e0b;font-size:14px;">${'★'.repeat(stars)}${'☆'.repeat(5-stars)}</span>
-      <span style="color:#64748b;font-size:11px;font-weight:600;">(${(product.reviewCount || 0).toLocaleString()} reviews)</span>
+      <span style="color:#475569;font-size:11px;font-weight:700;">${(product.reviewCount || 0).toLocaleString()} reviews</span>
+      <span style="color:#94a3b8;font-size:11px;">•</span>
+      <span style="color:#0f766e;font-size:11px;font-weight:700;">${priceNote}</span>
     </div>
   </div>
   <div style="text-align:center;">
-    <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:4px;">Best Price</div>
-    <div style="font-size:1.75rem;font-weight:900;color:#1e293b;line-height:1;">${product.price}</div>
-    <a href="${amazonUrl}" target="_blank" rel="nofollow sponsored noopener" style="display:inline-block;margin-top:12px;padding:12px 24px;background:linear-gradient(135deg,#1e293b,#334155);color:#fff;text-decoration:none;border-radius:10px;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;box-shadow:0 4px 15px rgba(0,0,0,0.2);transition:transform 0.2s;">Check Price →</a>
+    <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Current price</div>
+    <div style="font-size:1.75rem;font-weight:900;color:#0f172a;line-height:1;">${product.price}</div>
+    <a href="${amazonUrl}" target="_blank" rel="nofollow sponsored noopener" style="display:inline-block;margin-top:12px;padding:12px 22px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;text-decoration:none;border-radius:12px;font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;box-shadow:0 12px 24px rgba(37,99,235,0.25);">Check Price →</a>
   </div>
 </div>
 <!-- /AmzWP Tactical Link -->`;
@@ -3330,79 +3448,89 @@ const generateEliteBentoHtml = (
   const bullets = product.evidenceClaims?.length ? product.evidenceClaims.slice(0, 4) : generateSmartClaims(product);
   const verdict = product.verdict || generateSmartVerdict(product);
   const faqs = generateProductFaqs(product);
+  const reviewLabel = `${(product.reviewCount || 0).toLocaleString()} verified reviews`;
 
   const faqHtml = faqs.map((faq, idx) => `
-    <div style="border-bottom:${idx < faqs.length - 1 ? '1px solid #e2e8f0' : 'none'};padding:12px 0;">
-      <div style="font-weight:700;color:#1e293b;font-size:13px;margin-bottom:6px;">${faq.q}</div>
-      <div style="color:#64748b;font-size:12px;line-height:1.5;">${faq.a}</div>
+    <div style="border-bottom:${idx < faqs.length - 1 ? '1px solid #e2e8f0' : 'none'};padding:14px 0;">
+      <div style="font-weight:800;color:#0f172a;font-size:13px;margin-bottom:6px;">${faq.q}</div>
+      <div style="color:#475569;font-size:12px;line-height:1.6;">${faq.a}</div>
     </div>
   `).join('');
 
   return `
 <!-- AmzWP Elite Bento Box -->
-<div style="max-width:1000px;margin:3rem auto;padding:0;background:#fff;border-radius:2.5rem;box-shadow:0 25px 80px rgba(0,0,0,0.1);overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<section aria-label="Recommended product" style="max-width:1000px;margin:3rem auto;padding:0;background:#ffffff;border-radius:2rem;box-shadow:0 28px 80px rgba(15,23,42,0.12);overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border:1px solid #dbeafe;">
 
-  <div style="background:linear-gradient(135deg,#1e293b,#334155);padding:1rem 2rem;display:flex;justify-content:space-between;align-items:center;">
-    <span style="color:#fbbf24;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.15em;">Editor's Choice</span>
-    <span style="color:#94a3b8;font-size:10px;font-weight:600;">Verified ${currentDate}</span>
+  <div style="background:linear-gradient(135deg,#eff6ff,#ffffff 55%,#eef2ff);padding:1rem 1.5rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #dbeafe;gap:1rem;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <span style="background:#0f172a;color:#ffffff;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.15em;padding:8px 12px;border-radius:999px;">Editor’s Choice</span>
+      <span style="color:#1d4ed8;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;">High-conviction pick</span>
+    </div>
+    <span style="color:#475569;font-size:10px;font-weight:700;">Verified ${currentDate}</span>
   </div>
 
   <div style="display:flex;flex-wrap:wrap;">
-    <div style="flex:1;min-width:280px;padding:2.5rem;background:linear-gradient(135deg,#f8fafc,#fff);display:flex;align-items:center;justify-content:center;position:relative;">
-      <div style="position:absolute;top:1rem;left:1rem;background:#fff;padding:8px 14px;border-radius:2rem;box-shadow:0 4px 15px rgba(0,0,0,0.1);display:flex;align-items:center;gap:6px;">
+    <div style="flex:0.95;min-width:280px;padding:2.25rem;background:radial-gradient(circle at top,#ffffff 0%,#eff6ff 100%);display:flex;align-items:center;justify-content:center;position:relative;border-right:1px solid #e2e8f0;">
+      <div style="position:absolute;top:1rem;left:1rem;background:#ffffff;padding:9px 14px;border-radius:999px;box-shadow:0 10px 24px rgba(15,23,42,0.08);display:flex;align-items:center;gap:8px;border:1px solid #e2e8f0;">
         <span style="color:#f59e0b;font-size:12px;">${'★'.repeat(stars)}</span>
-        <span style="color:#64748b;font-size:11px;font-weight:600;">${(product.reviewCount || 0).toLocaleString()}</span>
+        <span style="color:#334155;font-size:11px;font-weight:700;">${reviewLabel}</span>
       </div>
-      <img src="${product.imageUrl}" alt="${product.title}" style="max-width:280px;max-height:280px;object-fit:contain;filter:drop-shadow(0 20px 40px rgba(0,0,0,0.15));">
-      ${product.prime ? '<div style="position:absolute;bottom:1rem;left:1rem;background:#232f3e;color:#fff;padding:6px 12px;border-radius:8px;font-size:10px;font-weight:700;">Prime</div>' : ''}
+      <img src="${product.imageUrl}" alt="${product.title}" style="max-width:280px;max-height:280px;object-fit:contain;filter:drop-shadow(0 24px 48px rgba(15,23,42,0.18));mix-blend-mode:multiply;">
+      ${product.prime ? '<div style="position:absolute;bottom:1rem;left:1rem;background:#0f172a;color:#fff;padding:7px 12px;border-radius:999px;font-size:10px;font-weight:700;">Prime delivery</div>' : ''}
     </div>
 
-    <div style="flex:1.2;min-width:320px;padding:2.5rem;">
-      <div style="display:inline-block;background:linear-gradient(135deg,#eff6ff,#dbeafe);color:#2563eb;padding:6px 14px;border-radius:2rem;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:1rem;">${product.category || 'Featured'}</div>
+    <div style="flex:1.25;min-width:320px;padding:2.25rem;">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:1rem;">
+        <span style="display:inline-block;background:linear-gradient(135deg,#eff6ff,#dbeafe);color:#2563eb;padding:6px 14px;border-radius:999px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;">${product.category || 'Featured'}</span>
+        <span style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;">${product.brand || 'Amazon bestseller'}</span>
+      </div>
 
-      <h3 style="margin:0 0 1rem;font-size:1.75rem;font-weight:900;color:#0f172a;line-height:1.2;">${product.title}</h3>
+      <h3 style="margin:0 0 0.9rem;font-size:1.85rem;font-weight:900;color:#0f172a;line-height:1.15;letter-spacing:-0.02em;">${product.title}</h3>
 
-      <div style="background:#f8fafc;border-left:4px solid #3b82f6;padding:1rem 1.25rem;border-radius:0 1rem 1rem 0;margin-bottom:1.5rem;">
-        <p style="margin:0;color:#475569;font-size:14px;line-height:1.6;">${verdict}</p>
-        <div style="margin-top:10px;display:flex;align-items:center;gap:8px;">
-          <span style="color:#22c55e;font-size:11px;font-weight:600;">Verified Analysis</span>
+      <div style="background:linear-gradient(135deg,#f8fafc,#eff6ff);border:1px solid #dbeafe;padding:1rem 1.15rem;border-radius:1rem;margin-bottom:1.5rem;">
+        <p style="margin:0;color:#334155;font-size:14px;line-height:1.65;font-weight:500;">${verdict}</p>
+        <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span style="color:#0f766e;font-size:11px;font-weight:700;">Verified analysis</span>
+          <span style="color:#94a3b8;font-size:11px;">•</span>
+          <span style="color:#1d4ed8;font-size:11px;font-weight:700;">Structured for rich snippets</span>
         </div>
       </div>
 
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:1.5rem;">
         ${bullets.map(claim => `
-          <div style="display:flex;align-items:flex-start;gap:8px;padding:10px;background:#f0fdf4;border-radius:10px;">
-            <span style="color:#22c55e;font-weight:bold;font-size:12px;">+</span>
-            <span style="color:#166534;font-size:12px;font-weight:500;line-height:1.4;">${claim}</span>
+          <div style="display:flex;align-items:flex-start;gap:8px;padding:12px;background:#ffffff;border-radius:12px;border:1px solid #e2e8f0;box-shadow:0 6px 16px rgba(15,23,42,0.04);">
+            <span style="color:#2563eb;font-weight:bold;font-size:12px;">+</span>
+            <span style="color:#1e293b;font-size:12px;font-weight:600;line-height:1.5;">${claim}</span>
           </div>
         `).join('')}
       </div>
 
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;padding-top:1.5rem;border-top:1px solid #e2e8f0;">
         <div>
-          <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;">Best Price</div>
+          <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;">Current Amazon price</div>
           <div style="font-size:2.5rem;font-weight:900;color:#0f172a;line-height:1;">${product.price}</div>
+          <div style="margin-top:6px;color:#0f766e;font-size:11px;font-weight:700;">${product.prime ? 'Fast Prime shipping available' : 'Availability may vary by seller'}</div>
         </div>
-        <a href="${amazonUrl}" target="_blank" rel="nofollow sponsored noopener" style="display:inline-flex;align-items:center;gap:10px;padding:16px 28px;background:linear-gradient(135deg,#1e293b,#334155);color:#fff;text-decoration:none;border-radius:14px;font-weight:800;font-size:13px;text-transform:uppercase;letter-spacing:0.1em;box-shadow:0 10px 30px rgba(30,41,59,0.3);">
+        <a href="${amazonUrl}" target="_blank" rel="nofollow sponsored noopener" aria-label="Check price for ${product.title} on Amazon" style="display:inline-flex;align-items:center;gap:10px;padding:16px 28px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;text-decoration:none;border-radius:14px;font-weight:800;font-size:13px;text-transform:uppercase;letter-spacing:0.1em;box-shadow:0 14px 30px rgba(37,99,235,0.28);">
           Check Price
-          <span style="font-size:16px;">-></span>
+          <span style="font-size:16px;">→</span>
         </a>
       </div>
     </div>
   </div>
 
   <div style="background:#f8fafc;padding:1.5rem 2rem;border-top:1px solid #e2e8f0;">
-    <div style="font-size:12px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:1rem;">Frequently Asked Questions</div>
+    <div style="font-size:12px;font-weight:800;color:#0f172a;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:1rem;">Frequently Asked Questions</div>
     ${faqHtml}
   </div>
 
   <div style="background:#fff;padding:1rem 2rem;display:flex;justify-content:center;gap:2rem;flex-wrap:wrap;border-top:1px solid #e2e8f0;">
-    <span style="color:#64748b;font-size:11px;display:flex;align-items:center;gap:6px;">Secure Checkout</span>
-    <span style="color:#64748b;font-size:11px;display:flex;align-items:center;gap:6px;">Fast Shipping</span>
-    <span style="color:#64748b;font-size:11px;display:flex;align-items:center;gap:6px;">Easy Returns</span>
-    <span style="color:#64748b;font-size:11px;display:flex;align-items:center;gap:6px;">Amazon Verified</span>
+    <span style="color:#475569;font-size:11px;display:flex;align-items:center;gap:6px;font-weight:700;">Secure Checkout</span>
+    <span style="color:#475569;font-size:11px;display:flex;align-items:center;gap:6px;font-weight:700;">Fast Shipping</span>
+    <span style="color:#475569;font-size:11px;display:flex;align-items:center;gap:6px;font-weight:700;">Easy Returns</span>
+    <span style="color:#475569;font-size:11px;display:flex;align-items:center;gap:6px;font-weight:700;">Amazon Verified</span>
   </div>
-</div>
+</section>
 <!-- /AmzWP Elite Bento Box -->`;
 };
 
