@@ -8,9 +8,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     tsConfigPaths({ projects: ['./tsconfig.json'] }),
     tailwindcss(),
-    tanstackStart({
-      tsr: { srcDirectory: 'src' },
-    }),
+    tanstackStart({}),
     mode === 'development' && componentTagger(),
   ].filter(Boolean),
   server: {
