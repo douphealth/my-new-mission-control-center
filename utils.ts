@@ -369,6 +369,7 @@ export interface ScanProgressEvent {
   candidatesEvaluated: number;
   productsKept: number;
   skipped: number;
+  skippedItems: SkippedCandidate[];
 }
 
 export type ScanProgressHandler = (event: ScanProgressEvent) => void;
@@ -469,6 +470,7 @@ class BudgetTracker {
         candidatesEvaluated: this.candidatesEvaluated,
         productsKept: this.productsKept,
         skipped: this.skipped.length,
+        skippedItems: this.skipped.slice(-12),
       });
     } catch {
       // Progress handler errors must never break the scan.
