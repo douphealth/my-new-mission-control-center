@@ -272,7 +272,9 @@ export async function pushToSupabase(options?: { mirrorDeletes?: boolean }): Pro
     const syncedTables: string[] = [];
 
     try {
+        const available = await getAvailableRemoteTables(client);
         for (const { local, remote } of TABLE_MAP) {
+            if (!available[remote]) continue;
             const items = await local.toArray();
             const localIds = new Set(items.map((item: any) => item.id));
 
@@ -302,7 +304,7 @@ export async function pushToSupabase(options?: { mirrorDeletes?: boolean }): Pro
 
         // Push settings
         const settings = await db.settings.get('default');
-        if (settings) {
+        if (settings && available.mc_settings) {
             const { error } = await client.from('mc_settings').upsert(
                 [{ id: 'default', data: settings }],
                 { onConflict: 'id' }
@@ -311,10 +313,12 @@ export async function pushToSupabase(options?: { mirrorDeletes?: boolean }): Pro
         }
 
         // Log sync
-        await client.from('mc_sync_log').insert([{
-            direction: mirrorDeletes ? 'push_mirror' : 'push',
-            tables: syncedTables,
-        }]);
+        if (available.mc_sync_log) {
+            await client.from('mc_sync_log').insert([{
+                direction: mirrorDeletes ? 'push_mirror' : 'push',
+                tables: syncedTables,
+            }]);
+        }
 
         syncCallbacks.forEach(cb => cb());
         return { success: true, synced: totalSynced };
@@ -333,7 +337,9 @@ export async function pullFromSupabase(): Promise<{ success: boolean; synced: nu
     let totalUpdated = 0;
 
     try {
+        const available = await getAvailableRemoteTables(client);
         for (const { local, remote } of TABLE_MAP) {
+            if (!available[remote]) continue;
             const { data, error } = await client.from(remote).select('id, data');
             if (error) {
                 if (error.code === '42P01') continue;
@@ -368,16 +374,20 @@ export async function pullFromSupabase(): Promise<{ success: boolean; synced: nu
         }
 
         // Pull settings (merge, don't overwrite)
-        const { data: settingsData } = await client.from('mc_settings').select('data').eq('id', 'default').single();
-        if (settingsData?.data) {
-            await db.settings.put({ ...settingsData.data, id: 'default' });
+        if (available.mc_settings) {
+            const { data: settingsData } = await client.from('mc_settings').select('data').eq('id', 'default').single();
+            if (settingsData?.data) {
+                await db.settings.put({ ...settingsData.data, id: 'default' });
+            }
         }
 
         // Log sync
-        await client.from('mc_sync_log').insert([{
-            direction: 'pull',
-            tables: TABLE_MAP.map(t => t.remote),
-        }]);
+        if (available.mc_sync_log) {
+            await client.from('mc_sync_log').insert([{
+                direction: 'pull',
+                tables: TABLE_MAP.map(t => t.remote).filter(table => available[table]),
+            }]);
+        }
 
         const removedDuplicates = await deduplicateAll();
         markCloudBaselineReady();
