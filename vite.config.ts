@@ -1,39 +1,50 @@
-import { defineConfig } from "vite";
+import { defineConfig, type PluginOption } from "vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
-  server: {
-    host: "::",
-    port: 8080,
-    hmr: {
-      overlay: false,
+export default defineConfig(({ mode }) => {
+  const plugins: PluginOption[] = [
+    ...tanstackStart(),
+    react(),
+  ];
+
+  if (mode === "development") {
+    plugins.push(componentTagger());
+  }
+
+  return {
+    server: {
+      host: "::",
+      port: 8080,
+      hmr: {
+        overlay: false,
+      },
     },
-  },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-radix': [
-            '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-popover', '@radix-ui/react-select',
-            '@radix-ui/react-tabs', '@radix-ui/react-tooltip',
-          ],
-          'vendor-charts': ['recharts'],
-          'vendor-motion': ['framer-motion'],
-          'vendor-supabase': ['@supabase/supabase-js'],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            "vendor-react": ["react", "react-dom"],
+            "vendor-radix": [
+              "@radix-ui/react-dialog", "@radix-ui/react-dropdown-menu",
+              "@radix-ui/react-popover", "@radix-ui/react-select",
+              "@radix-ui/react-tabs", "@radix-ui/react-tooltip",
+            ],
+            "vendor-charts": ["recharts"],
+            "vendor-motion": ["framer-motion"],
+            "vendor-supabase": ["@supabase/supabase-js"],
+          },
         },
       },
     },
-  },
-  plugins: [tanstackStart(), react(), mode === "development" && componentTagger()].filter(Boolean),
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
+    plugins,
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
+      },
     },
-  },
-}));
+  };
+});
