@@ -9,10 +9,31 @@ let supabaseClient: SupabaseClient | null = null;
 let realtimeChannel: RealtimeChannel | null = null;
 let syncCallbacks: (() => void)[] = [];
 let schemaAvailability: Record<string, boolean> | null = null;
+let schemaErrors: SyncSchemaError[] = [];
 
 const DEFAULT_SUPABASE_URL = 'https://dszpokkqhrtjutmvcxnh.supabase.co';
 const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_DR3JoohreA2S4Z3akVmICQ_ZZp2DSnW';
 const CLOUD_BASELINE_KEY = 'mc-cloud-baseline-ready';
+const LAST_SYNC_FALLBACK_KEY = 'mc-last-sync-at';
+
+export interface SyncSchemaError {
+    table: string;
+    code?: string;
+    message: string;
+    details?: string | null;
+    hint?: string | null;
+    status?: number;
+    checkedAt: string;
+}
+
+export interface SyncDiagnostics {
+    connected: boolean;
+    projectHost: string;
+    lastSyncAt: string | null;
+    queuedChanges: number;
+    availableTables: Record<string, boolean>;
+    schemaErrors: SyncSchemaError[];
+}
 
 export function getDefaultSupabaseUrl(): string {
     return DEFAULT_SUPABASE_URL;
@@ -55,11 +76,38 @@ async function getAvailableRemoteTables(client: SupabaseClient): Promise<Record<
     const checks = await Promise.all(
         [...TABLE_MAP.map(t => t.remote), 'mc_settings', 'mc_sync_log'].map(async (table) => {
             const { error } = await client.from(table).select('id').limit(1);
-            return [table, !error || error.code !== '42P01'] as const;
+            if (error && (error.code === '42P01' || error.code === 'PGRST205')) {
+                schemaErrors.push({
+                    table,
+                    code: error.code,
+                    message: error.message,
+                    details: error.details,
+                    hint: error.hint,
+                    checkedAt: new Date().toISOString(),
+                });
+                return [table, false] as const;
+            }
+            if (error) {
+                schemaErrors.push({
+                    table,
+                    code: error.code,
+                    message: error.message,
+                    details: error.details,
+                    hint: error.hint,
+                    checkedAt: new Date().toISOString(),
+                });
+            }
+            return [table, !error] as const;
         })
     );
     schemaAvailability = Object.fromEntries(checks);
     return schemaAvailability;
+}
+
+function markLastSyncNow(): void {
+    try {
+        localStorage.setItem(LAST_SYNC_FALLBACK_KEY, new Date().toISOString());
+    } catch { }
 }
 
 // ─── Config management ─────────────────────────────────────────────────────────
@@ -82,6 +130,7 @@ export function setSupabaseConfig(url: string, anonKey: string): void {
         realtimeChannel = null;
     }
     schemaAvailability = null;
+    schemaErrors = [];
     supabaseClient = null;
 }
 
@@ -94,6 +143,7 @@ export function clearSupabaseConfig(): void {
         realtimeChannel = null;
     }
     schemaAvailability = null;
+    schemaErrors = [];
     supabaseClient = null;
 }
 
@@ -320,6 +370,7 @@ export async function pushToSupabase(options?: { mirrorDeletes?: boolean }): Pro
             }]);
         }
 
+        markLastSyncNow();
         syncCallbacks.forEach(cb => cb());
         return { success: true, synced: totalSynced };
     } catch (e: any) {
@@ -391,6 +442,7 @@ export async function pullFromSupabase(): Promise<{ success: boolean; synced: nu
 
         const removedDuplicates = await deduplicateAll();
         markCloudBaselineReady();
+        markLastSyncNow();
         syncCallbacks.forEach(cb => cb());
         return { success: true, synced: totalAdded + totalUpdated + removedDuplicates, added: totalAdded, updated: totalUpdated };
     } catch (e: any) {
@@ -480,7 +532,7 @@ export async function syncFromSupabase(table: string): Promise<any[] | null> {
 
 export async function getLastSyncTime(): Promise<string | null> {
     const client = getSupabase();
-    if (!client) return null;
+    if (!client) return localStorage.getItem(LAST_SYNC_FALLBACK_KEY);
     try {
         const { data } = await client
             .from('mc_sync_log')
@@ -488,8 +540,36 @@ export async function getLastSyncTime(): Promise<string | null> {
             .order('synced_at', { ascending: false })
             .limit(1)
             .single();
-        return data?.synced_at || null;
+        return data?.synced_at || localStorage.getItem(LAST_SYNC_FALLBACK_KEY);
     } catch {
-        return null;
+        return localStorage.getItem(LAST_SYNC_FALLBACK_KEY);
     }
+}
+
+export async function getSupabaseSyncDiagnostics(): Promise<SyncDiagnostics> {
+    const client = getSupabase();
+    const localCounts = await Promise.all(TABLE_MAP.map(async ({ local }) => local.count()));
+    const settings = await db.settings.get('default');
+    if (!client) {
+        return {
+            connected: false,
+            projectHost: getSupabaseProjectHost(),
+            lastSyncAt: await getLastSyncTime(),
+            queuedChanges: localCounts.reduce((sum, count) => sum + count, 0) + (settings ? 1 : 0),
+            availableTables: {},
+            schemaErrors,
+        };
+    }
+
+    schemaAvailability = null;
+    schemaErrors = [];
+    const availableTables = await getAvailableRemoteTables(client);
+    return {
+        connected: true,
+        projectHost: getSupabaseProjectHost(),
+        lastSyncAt: await getLastSyncTime(),
+        queuedChanges: localCounts.reduce((sum, count) => sum + count, 0) + (settings ? 1 : 0),
+        availableTables,
+        schemaErrors,
+    };
 }

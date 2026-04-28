@@ -14,6 +14,7 @@ import {
 } from "@/lib/supabase";
 import { generateStrongKey, setEncryptionKey, hasCustomEncryptionKey } from "@/lib/encryption";
 import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
+import SupabaseSyncConsole from "@/components/SupabaseSyncConsole";
 
 import { toast } from "sonner";
 
@@ -630,6 +631,8 @@ export default function SettingsPage() {
 
                 {/* Cloud Sync Actions */}
                 {sbConnected && (
+                  <>
+                  <SupabaseSyncConsole />
                   <div className="card-elevated p-6 space-y-4">
                     <div className="flex items-center justify-between">
                       <h2 className="font-semibold text-lg">Live Cloud Sync</h2>
@@ -675,6 +678,7 @@ export default function SettingsPage() {
                       </div>
                     )}
                   </div>
+                  </>
                 )}
 
                 {/* Schema */}
