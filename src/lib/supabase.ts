@@ -208,7 +208,7 @@ export function isSupabaseConnected(): boolean {
 
 // ─── Connection test ───────────────────────────────────────────────────────────
 
-export async function testSupabaseConnection(url: string, anonKey: string): Promise<{ ok: boolean; error?: string }> {
+export async function testSupabaseConnection(url: string, anonKey: string): Promise<SupabaseConnectionHealth> {
     try {
         const normalizedUrl = url.trim();
         const normalizedKey = anonKey.trim();
@@ -224,14 +224,36 @@ export async function testSupabaseConnection(url: string, anonKey: string): Prom
                 },
             });
         if (!client) throw new Error('Supabase client unavailable');
-        const { error } = await client.from('mc_sync_log').select('id').limit(1);
-        if (error && error.code !== 'PGRST116' && error.code !== '42P01' && error.code !== 'PGRST205') {
-            // PGRST116 = table doesn't exist yet — still means connection works
-            throw error;
+        const availability = await Promise.all(
+            REQUIRED_REMOTE_TABLES.map(async (table) => {
+                const { error } = await client.from(table).select('id').limit(1);
+                if (error && error.code !== 'PGRST116' && error.code !== '42P01' && error.code !== 'PGRST205') {
+                    throw error;
+                }
+                return [table, !(error && (error.code === 'PGRST116' || error.code === '42P01' || error.code === 'PGRST205'))] as const;
+            })
+        );
+        const missingTables = availability.filter(([, available]) => !available).map(([table]) => table);
+        const schemaReady = missingTables.length === 0;
+        if (!schemaReady) {
+            return {
+                ok: false,
+                connectionOk: true,
+                schemaReady: false,
+                missingTables,
+                error: buildSchemaBlockedMessage(missingTables),
+            };
         }
-        return { ok: true };
+
+        return { ok: true, connectionOk: true, schemaReady: true, missingTables: [] };
     } catch (e: any) {
-        return { ok: false, error: e?.message || 'Connection failed' };
+        return {
+            ok: false,
+            connectionOk: false,
+            schemaReady: false,
+            missingTables: [],
+            error: e?.message || 'Connection failed',
+        };
     }
 }
 
@@ -603,6 +625,8 @@ export async function getSupabaseSyncDiagnostics(): Promise<SyncDiagnostics> {
             lastSyncAt: await getLastSyncTime(),
             queuedChanges: localCounts.reduce((sum, count) => sum + count, 0) + (settings ? 1 : 0),
             availableTables: {},
+            schemaReady: false,
+            missingTables: [...REQUIRED_REMOTE_TABLES],
             schemaErrors,
         };
     }
@@ -610,12 +634,17 @@ export async function getSupabaseSyncDiagnostics(): Promise<SyncDiagnostics> {
     schemaAvailability = null;
     schemaErrors = [];
     const availableTables = await getAvailableRemoteTables(client);
+    const missingTables = Object.entries(availableTables)
+        .filter(([, available]) => !available)
+        .map(([table]) => table);
     return {
         connected: true,
         projectHost: getSupabaseProjectHost(),
         lastSyncAt: await getLastSyncTime(),
         queuedChanges: localCounts.reduce((sum, count) => sum + count, 0) + (settings ? 1 : 0),
         availableTables,
+        schemaReady: missingTables.length === 0,
+        missingTables,
         schemaErrors,
     };
 }
