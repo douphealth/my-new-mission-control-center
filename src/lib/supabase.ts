@@ -532,7 +532,7 @@ export async function syncFromSupabase(table: string): Promise<any[] | null> {
 
 export async function getLastSyncTime(): Promise<string | null> {
     const client = getSupabase();
-    if (!client) return null;
+    if (!client) return localStorage.getItem(LAST_SYNC_FALLBACK_KEY);
     try {
         const { data } = await client
             .from('mc_sync_log')
@@ -540,8 +540,36 @@ export async function getLastSyncTime(): Promise<string | null> {
             .order('synced_at', { ascending: false })
             .limit(1)
             .single();
-        return data?.synced_at || null;
+        return data?.synced_at || localStorage.getItem(LAST_SYNC_FALLBACK_KEY);
     } catch {
-        return null;
+        return localStorage.getItem(LAST_SYNC_FALLBACK_KEY);
     }
+}
+
+export async function getSupabaseSyncDiagnostics(): Promise<SyncDiagnostics> {
+    const client = getSupabase();
+    const localCounts = await Promise.all(TABLE_MAP.map(async ({ local }) => local.count()));
+    const settings = await db.settings.get('default');
+    if (!client) {
+        return {
+            connected: false,
+            projectHost: getSupabaseProjectHost(),
+            lastSyncAt: await getLastSyncTime(),
+            queuedChanges: localCounts.reduce((sum, count) => sum + count, 0) + (settings ? 1 : 0),
+            availableTables: {},
+            schemaErrors,
+        };
+    }
+
+    schemaAvailability = null;
+    schemaErrors = [];
+    const availableTables = await getAvailableRemoteTables(client);
+    return {
+        connected: true,
+        projectHost: getSupabaseProjectHost(),
+        lastSyncAt: await getLastSyncTime(),
+        queuedChanges: localCounts.reduce((sum, count) => sum + count, 0) + (settings ? 1 : 0),
+        availableTables,
+        schemaErrors,
+    };
 }
