@@ -428,7 +428,7 @@ function nlpExtractTask(line: string): NLPTaskResult {
       if (m[1] === '!!' || m[1]?.startsWith('!!!')) {
         priority = m[1].length >= 3 ? 'critical' : 'high';
       } else {
-        priority = extractPriority(m[1] || m[0]);
+        priority = extractPriority(m[1] || m[0]) || undefined;
       }
       title = title.replace(m[0], '').trim();
       break;
@@ -444,7 +444,7 @@ function nlpExtractTask(line: string): NLPTaskResult {
   for (const pat of statusPatterns) {
     const m = title.match(pat);
     if (m) {
-      status = extractStatus(m[1] || m[0]);
+      status = extractStatus(m[1] || m[0]) || undefined;
       title = title.replace(m[0], '').trim();
       break;
     }
