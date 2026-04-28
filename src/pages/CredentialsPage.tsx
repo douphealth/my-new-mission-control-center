@@ -81,8 +81,15 @@ export default function CredentialsPage() {
     return matchSearch && matchCat;
   });
 
-  const toggleReveal = (id: string) => {
+  const toggleReveal = async (id: string, credential?: CredentialVault) => {
     if (masterLocked) { toast.error("Unlock the vault first"); return; }
+    if (credential && !decryptedCache[id]) {
+      const [password, apiKey] = await Promise.all([
+        credential.password ? decrypt(credential.password) : Promise.resolve(""),
+        credential.apiKey ? decrypt(credential.apiKey) : Promise.resolve(""),
+      ]);
+      setDecryptedCache(prev => ({ ...prev, [id]: { password, apiKey } }));
+    }
     setRevealed(prev => {
       const n = new Set(prev);
       if (n.has(id)) { n.delete(id); } else {
@@ -95,7 +102,7 @@ export default function CredentialsPage() {
 
   const copySecret = async (rawValue: string, label: string) => {
     if (masterLocked) { toast.error("Unlock the vault first"); return; }
-    const decrypted = await decrypt(rawValue) || rawValue;
+    const decrypted = await decrypt(rawValue);
     navigator.clipboard.writeText(decrypted);
     toast.success(`${label} copied to clipboard`);
   };
@@ -104,22 +111,27 @@ export default function CredentialsPage() {
   const openEdit = async (c: CredentialVault) => {
     setEditId(c.id);
     const { id, ...rest } = c;
-    const decPassword = rest.password ? (await decrypt(rest.password) || rest.password) : "";
-    const decApiKey = rest.apiKey ? (await decrypt(rest.apiKey) || rest.apiKey) : "";
+    const decPassword = rest.password ? await decrypt(rest.password) : "";
+    const decApiKey = rest.apiKey ? await decrypt(rest.apiKey) : "";
     setForm({ ...rest, password: decPassword, apiKey: decApiKey });
     setModalOpen(true);
   };
 
   const saveForm = async () => {
     if (!form.label.trim()) { toast.error("Label is required"); return; }
-    const encPassword = form.password ? await encrypt(form.password) : "";
-    const encApiKey = form.apiKey ? await encrypt(form.apiKey) : "";
-    const encrypted = { ...form, password: encPassword, apiKey: encApiKey };
-    if (editId) { await updateItem<CredentialVault>("credentials", editId, encrypted); toast.success("Credential updated"); }
-    else {
-      const newId = await addItem<CredentialVault>("credentials", encrypted);
-      if (newId) toast.success("Credential added");
-      else { toast.error("Duplicate credential — already exists"); return; }
+    try {
+      const encPassword = form.password ? await encrypt(form.password) : "";
+      const encApiKey = form.apiKey ? await encrypt(form.apiKey) : "";
+      const encrypted = { ...form, password: encPassword, apiKey: encApiKey };
+      if (editId) { await updateItem<CredentialVault>("credentials", editId, encrypted); toast.success("Credential updated"); }
+      else {
+        const newId = await addItem<CredentialVault>("credentials", encrypted);
+        if (newId) toast.success("Credential added");
+        else { toast.error("Duplicate credential — already exists"); return; }
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Credential encryption failed");
+      return;
     }
     setModalOpen(false);
   };
@@ -258,8 +270,8 @@ export default function CredentialsPage() {
                     </div>
                   </div>
                 )}
-                {cred.password && <MaskedField value={cred.password} label="Pass" isVisible={isRevealed} onReveal={() => toggleReveal(cred.id)} onCopy={() => copySecret(cred.password, "Password")} isMasterLocked={masterLocked} />}
-                {cred.apiKey && <MaskedField value={cred.apiKey} label="API Key" isVisible={isRevealed} onReveal={() => toggleReveal(cred.id)} onCopy={() => copySecret(cred.apiKey, "API Key")} isMasterLocked={masterLocked} />}
+                {cred.password && <MaskedField value={cred.password} decryptedValue={decryptedCache[cred.id]?.password} label="Pass" isVisible={isRevealed} onReveal={() => toggleReveal(cred.id, cred)} onCopy={() => copySecret(cred.password, "Password")} isMasterLocked={masterLocked} />}
+                {cred.apiKey && <MaskedField value={cred.apiKey} decryptedValue={decryptedCache[cred.id]?.apiKey} label="API Key" isVisible={isRevealed} onReveal={() => toggleReveal(cred.id, cred)} onCopy={() => copySecret(cred.apiKey, "API Key")} isMasterLocked={masterLocked} />}
               </div>
               <div className="flex items-center justify-between">
                 <span className={`badge text-[10px] ${catColor}`}>{cred.category}</span>

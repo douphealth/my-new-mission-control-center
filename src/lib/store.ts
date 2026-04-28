@@ -229,10 +229,10 @@ function getDefaultData(): StoreData {
       { id: genId(), title: "Newsletter Growth System", description: "Build an automated system for growing newsletter subscribers. Landing pages, lead magnets, and drip sequences.", category: "Marketing", priority: "low", status: "parked", tags: ["newsletter", "marketing", "automation"], linkedProject: "", votes: 1, createdAt: "2026-01-25", updatedAt: "2026-01-25" },
     ],
     credentials: [
-      { id: genId(), label: "Cloudflare Account", service: "Cloudflare", url: "https://dash.cloudflare.com", username: "alex@email.com", password: "CF_s3cure!", apiKey: "cf_api_key_here", notes: "Main account managing 4 domains", category: "Infrastructure", createdAt: "2025-06-01" },
-      { id: genId(), label: "Vercel Account", service: "Vercel", url: "https://vercel.com/dashboard", username: "alex@email.com", password: "V3rc3l_prod!", apiKey: "vercel_token_here", notes: "Pro plan, 3 projects", category: "Hosting", createdAt: "2025-08-01" },
-      { id: genId(), label: "GitHub Account", service: "GitHub", url: "https://github.com", username: "alexdev", password: "GH_t0ken!", apiKey: "ghp_token_here", notes: "Personal access token for API", category: "Development", createdAt: "2024-11-01" },
-      { id: genId(), label: "Stripe Account", service: "Stripe", url: "https://dashboard.stripe.com", username: "alex@email.com", password: "Str1pe!", apiKey: "sk_live_xxx", notes: "Connected to SaaS Landing Page", category: "Payments", createdAt: "2025-09-01" },
+      { id: genId(), label: "Cloudflare Account", service: "Cloudflare", url: "https://dash.cloudflare.com", username: "", password: "", apiKey: "", notes: "Infrastructure account placeholder", category: "Infrastructure", createdAt: "2025-06-01" },
+      { id: genId(), label: "Vercel Account", service: "Vercel", url: "https://vercel.com/dashboard", username: "", password: "", apiKey: "", notes: "Hosting account placeholder", category: "Hosting", createdAt: "2025-08-01" },
+      { id: genId(), label: "GitHub Account", service: "GitHub", url: "https://github.com", username: "", password: "", apiKey: "", notes: "Development account placeholder", category: "Development", createdAt: "2024-11-01" },
+      { id: genId(), label: "Stripe Account", service: "Stripe", url: "https://dashboard.stripe.com", username: "", password: "", apiKey: "", notes: "Payments account placeholder", category: "Payments", createdAt: "2025-09-01" },
     ],
   };
 }
