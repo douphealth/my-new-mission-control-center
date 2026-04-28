@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { forwardRef, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Clock3, Database, RefreshCw, ServerCrash } from 'lucide-react';
 import { getSupabaseSyncDiagnostics, onSyncComplete, type SyncDiagnostics } from '@/lib/supabase';
 
@@ -7,7 +7,7 @@ function formatTime(value: string | null) {
   return new Date(value).toLocaleString();
 }
 
-export default function SupabaseSyncConsole() {
+const SupabaseSyncConsole = forwardRef<HTMLElement>(function SupabaseSyncConsole(_props, ref) {
   const [diagnostics, setDiagnostics] = useState<SyncDiagnostics | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -41,7 +41,7 @@ export default function SupabaseSyncConsole() {
   }, [diagnostics]);
 
   return (
-    <section className="border border-border/40 bg-card/70 p-4 sm:p-5 space-y-4">
+    <section ref={ref} className="border border-border/40 bg-card/70 p-4 sm:p-5 space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
@@ -77,6 +77,17 @@ export default function SupabaseSyncConsole() {
         </div>
       </div>
 
+      {diagnostics && !diagnostics.schemaReady && (
+        <div className="border border-destructive/30 bg-destructive/5 p-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 font-medium text-destructive">
+            <AlertTriangle size={14} /> Sync is blocked until the Supabase schema is created.
+          </div>
+          <div className="mt-2">
+            Missing tables: <span className="font-mono text-foreground">{diagnostics.missingTables.join(', ')}</span>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-2">
         <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
           {diagnostics?.schemaErrors.length ? <ServerCrash size={14} className="text-destructive" /> : <CheckCircle2 size={14} className="text-success" />}
@@ -96,4 +107,6 @@ export default function SupabaseSyncConsole() {
       </div>
     </section>
   );
-}
+});
+
+export default SupabaseSyncConsole;
