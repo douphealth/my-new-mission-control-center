@@ -59,15 +59,17 @@ function NotificationStarter() {
 
 const App = () => (
   <ErrorBoundary>
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Sonner />
-        <DashboardProvider>
-          <NotificationStarter />
-          <DashboardLayout />
-        </DashboardProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <div className="contents">
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Sonner />
+          <DashboardProvider>
+            <NotificationStarter />
+            <DashboardLayout />
+          </DashboardProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </div>
   </ErrorBoundary>
 );
 
