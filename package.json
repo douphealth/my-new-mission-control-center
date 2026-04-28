@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/patch-dexie.mjs && vite build",
-    "build:dev": "node scripts/patch-dexie.mjs && vite build --mode development",
+    "build": "node scripts/patch-dexie.mjs && vitest run src/test/production-smoke.test.ts && vite build",
+    "build:dev": "node scripts/patch-dexie.mjs && vitest run src/test/production-smoke.test.ts && vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
