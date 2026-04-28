@@ -25,11 +25,11 @@ export const Route = createFileRoute('/dashboard')({
   ),
 });
 
-const NAV = [
+const NAV: Array<{ to: '/dashboard' | '/dashboard/sites' | '/dashboard/generator'; label: string; exact?: boolean; icon: string }> = [
   { to: '/dashboard', label: 'Overview', exact: true, icon: 'M3 12l9-9 9 9M5 10v10h14V10' },
   { to: '/dashboard/sites', label: 'Sites', icon: 'M3 7h18M3 12h18M3 17h18' },
   { to: '/dashboard/generator', label: 'Generator', icon: 'M13 2L3 14h9l-1 8 10-12h-9l1-8z' },
-] as const;
+];
 
 function DashboardChrome() {
   const { user, signOut, loading, session } = useAuth();
