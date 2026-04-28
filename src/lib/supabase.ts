@@ -9,6 +9,8 @@ let supabaseClient: SupabaseClient | null = null;
 let realtimeChannel: RealtimeChannel | null = null;
 let syncCallbacks: (() => void)[] = [];
 
+const DEFAULT_SUPABASE_URL = 'https://dszpokkqhrtjutmvcxnh.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_DR3JoohreA2S4Z3akVmICQ_ZZp2DSnW';
 const CLOUD_BASELINE_KEY = 'mc-cloud-baseline-ready';
 
 function hasCloudBaseline(): boolean {
@@ -47,7 +49,7 @@ export function getSupabaseConfig(): { url: string; anonKey: string } | null {
         const anonKey = localStorage.getItem('mc-supabase-anon-key');
         if (url && anonKey && url.startsWith('https://')) return { url, anonKey };
     } catch { }
-    return null;
+    return { url: DEFAULT_SUPABASE_URL, anonKey: DEFAULT_SUPABASE_ANON_KEY };
 }
 
 export function setSupabaseConfig(url: string, anonKey: string): void {
