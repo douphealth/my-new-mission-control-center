@@ -934,7 +934,7 @@ const fetchAllPostsViaWordPressAPI = async (config: AppConfig): Promise<BlogPost
     throw new Error('WordPress credentials not configured');
   }
 
-  const apiBase = config.wpUrl.replace(/\/$/, '') + '/wp-json/wp/v2';
+  const apiBase = getWordPressApiBaseUrl(config.wpUrl);
   const auth = btoa(`${config.wpUser}:${config.wpAppPassword}`);
   const allPosts: BlogPost[] = [];
   let page = 1;
@@ -1301,7 +1301,7 @@ const fetchViaWordPressAPI = async (
 
     if (!slug) return null;
 
-    const apiBase = config.wpUrl.replace(/\/$/, '') + '/wp-json/wp/v2';
+    const apiBase = getWordPressApiBaseUrl(config.wpUrl);
     const auth = btoa(`${config.wpUser}:${config.wpAppPassword}`);
 
     // Try posts first
@@ -1350,7 +1350,7 @@ export const fetchRawPostContent = async (
   // Try WordPress API with ID first
   if (config.wpUrl && config.wpUser && config.wpAppPassword) {
     try {
-      const apiBase = config.wpUrl.replace(/\/$/, '') + '/wp-json/wp/v2';
+      const apiBase = getWordPressApiBaseUrl(config.wpUrl);
       const auth = btoa(`${config.wpUser}:${config.wpAppPassword}`);
 
       let response = await fetchWithTimeout(
@@ -1472,7 +1472,7 @@ export const pushToWordPress = async (
     throw new Error('WordPress credentials not configured. Please configure in Settings.');
   }
 
-  const apiUrl = `${config.wpUrl.replace(/\/$/, '')}/wp-json/wp/v2/posts/${postId}`;
+  const apiUrl = `${getWordPressApiBaseUrl(config.wpUrl)}/posts/${postId}`;
   const auth = btoa(`${config.wpUser}:${config.wpAppPassword}`);
 
   const response = await fetchWithTimeout(
@@ -1523,8 +1523,8 @@ export const testConnection = async (
   }
 
   try {
-    const baseUrl = config.wpUrl.replace(/\/$/, '');
-    const apiUrl = `${baseUrl}/wp-json/wp/v2/users/me`;
+    const baseUrl = getWordPressSiteBaseUrl(config.wpUrl);
+    const apiUrl = `${getWordPressApiBaseUrl(config.wpUrl)}/users/me`;
 
     const auth = btoa(`${config.wpUser}:${config.wpAppPassword}`);
 
@@ -4206,7 +4206,7 @@ export const fetchPostsFromWordPressAPI = async (
   let totalPages = 1;
   let totalPosts = 0;
 
-  const apiBase = config.wpUrl.replace(/\/$/, '') + '/wp-json/wp/v2';
+  const apiBase = getWordPressApiBaseUrl(config.wpUrl);
 
   const headers: Record<string, string> = {};
   if (config.wpUser && config.wpAppPassword) {
