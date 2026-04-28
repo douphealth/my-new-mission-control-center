@@ -3,6 +3,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { PremiumProductBox } from '../../components/PremiumProductBox';
 import type { ProductDetails } from '../../types';
+import ogCover from '../assets/og-cover.jpg';
+
+const SITE_URL = 'https://basic-app-canvas.lovable.app';
 
 /* -------------------------------------------------------------------------- */
 /*  SEO                                                                       */
