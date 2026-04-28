@@ -77,9 +77,11 @@ function RootComponent() {
         )}
       >
         <QueryClientProvider client={queryClient}>
-          <Outlet />
-          <Toaster richColors position="top-right" />
-          <ReactQueryDevtools initialIsOpen={false} />
+          <AuthProvider>
+            <Outlet />
+            <Toaster richColors position="top-right" />
+            <ReactQueryDevtools initialIsOpen={false} />
+          </AuthProvider>
         </QueryClientProvider>
       </ErrorBoundary>
     </RootDocument>
