@@ -56,7 +56,7 @@ export default function StatusBar() {
   const supabaseConnected = isSupabaseConnected();
 
   return (
-    <footer className="sticky bottom-0 z-20 hidden lg:flex bg-card/80 backdrop-blur-xl border-t border-border/20 px-5 h-8 items-center justify-between text-[11px] text-muted-foreground/60">
+    <footer className="enterprise-panel sticky bottom-0 z-20 hidden lg:flex border-x-0 border-b-0 rounded-none shadow-none px-5 h-8 items-center justify-between text-[11px] text-muted-foreground/70">
       <div className="flex items-center gap-4">
         {online ? (
           <span className="flex items-center gap-1.5 text-success font-medium">

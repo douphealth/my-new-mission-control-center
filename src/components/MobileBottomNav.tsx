@@ -74,7 +74,7 @@ export default function MobileBottomNav() {
               dragElastic={{ top: 0, bottom: 0.5 }}
               onDragEnd={handleDragEnd}
               style={{ y: dragY, opacity: sheetOpacity }}
-              className="fixed bottom-[72px] left-0 right-0 z-50 bg-card/98 backdrop-blur-2xl rounded-t-[28px] border-t border-x border-border/30 shadow-[0_-8px_40px_rgba(0,0,0,0.2)] lg:hidden"
+              className="enterprise-panel fixed bottom-[72px] left-0 right-0 z-50 rounded-t-[28px] border-b-0 shadow-[0_-18px_58px_-28px_hsl(var(--foreground)/0.45)] lg:hidden"
             >
               {/* Drag handle */}
               <div className="flex justify-center pt-3 pb-2">
@@ -99,7 +99,7 @@ export default function MobileBottomNav() {
                       whileTap={{ scale: 0.88 }}
                       className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl transition-all touch-manipulation
                         ${activeSection === item.id
-                          ? 'bg-primary/10 text-primary ring-1 ring-primary/20'
+                          ? 'bg-primary/12 text-primary ring-1 ring-primary/25 shadow-sm'
                           : 'text-muted-foreground active:bg-secondary/80'}`}
                     >
                       <span className="text-[22px] leading-none">{item.emoji}</span>
@@ -115,7 +115,7 @@ export default function MobileBottomNav() {
 
       {/* Bottom tab bar */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 lg:hidden">
-        <div className="bg-card/90 backdrop-blur-3xl border-t border-border/25 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_24px_rgba(0,0,0,0.08)]">
+        <div className="enterprise-panel border-x-0 border-b-0 rounded-none px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-14px_42px_-32px_hsl(var(--foreground)/0.5)]">
           <div className="flex items-center justify-around h-16">
             {primaryTabs.map(tab => {
               const isActive = tab.id === 'more' ? moreOpen : activeSection === tab.id;
@@ -147,7 +147,7 @@ export default function MobileBottomNav() {
                   {isActive && tab.id !== 'more' && (
                     <motion.div
                       layoutId="bottomTabIndicator"
-                      className="absolute top-0 left-1/2 -translate-x-1/2 w-10 h-[3px] bg-primary rounded-b-full"
+                      className="absolute top-0 left-1/2 -translate-x-1/2 w-10 h-[3px] bg-primary rounded-b-full shadow-[0_4px_16px_hsl(var(--primary)/0.5)]"
                       transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                     />
                   )}
