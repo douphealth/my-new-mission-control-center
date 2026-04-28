@@ -8,6 +8,7 @@ import { deduplicateAll } from './dedup';
 let supabaseClient: SupabaseClient | null = null;
 let realtimeChannel: RealtimeChannel | null = null;
 let syncCallbacks: (() => void)[] = [];
+let schemaAvailability: Record<string, boolean> | null = null;
 
 const DEFAULT_SUPABASE_URL = 'https://dszpokkqhrtjutmvcxnh.supabase.co';
 const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_DR3JoohreA2S4Z3akVmICQ_ZZp2DSnW';
@@ -49,6 +50,18 @@ function chunkArray<T>(items: T[], size: number): T[][] {
     return chunks;
 }
 
+async function getAvailableRemoteTables(client: SupabaseClient): Promise<Record<string, boolean>> {
+    if (schemaAvailability) return schemaAvailability;
+    const checks = await Promise.all(
+        [...TABLE_MAP.map(t => t.remote), 'mc_settings', 'mc_sync_log'].map(async (table) => {
+            const { error } = await client.from(table).select('id').limit(1);
+            return [table, !error || error.code !== '42P01'] as const;
+        })
+    );
+    schemaAvailability = Object.fromEntries(checks);
+    return schemaAvailability;
+}
+
 // ─── Config management ─────────────────────────────────────────────────────────
 
 export function getSupabaseConfig(): { url: string; anonKey: string } | null {
@@ -68,6 +81,7 @@ export function setSupabaseConfig(url: string, anonKey: string): void {
         realtimeChannel.unsubscribe();
         realtimeChannel = null;
     }
+    schemaAvailability = null;
     supabaseClient = null;
 }
 
@@ -79,6 +93,7 @@ export function clearSupabaseConfig(): void {
         realtimeChannel.unsubscribe();
         realtimeChannel = null;
     }
+    schemaAvailability = null;
     supabaseClient = null;
 }
 
