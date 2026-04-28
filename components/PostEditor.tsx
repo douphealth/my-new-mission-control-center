@@ -42,6 +42,7 @@ import {
   generateProductBoxHtml,
   generateComparisonTableHtml,
   fetchProductByASIN,
+  sanitizeAppConfig,
 } from '../utils';
 
 import { ProductBoxPreview } from './ProductBoxPreview';
@@ -93,6 +94,7 @@ interface ScanProgress {
   candidatesEvaluated?: number;
   productsKept?: number;
   skipped?: number;
+  skippedItems?: Array<{ name: string; reason: string; detail?: string }>;
 }
 
 interface ScanReportSummary {
@@ -159,6 +161,57 @@ const ScanProgressOverlay: React.FC<{ progress: ScanProgress | null }> = ({ prog
           className="h-full bg-gradient-to-r from-brand-500 to-purple-500 transition-all duration-500"
           style={{ width: `${pct}%` }}
         />
+      </div>
+    </div>
+  );
+};
+
+const ScanTelemetryPanel: React.FC<{
+  progress: ScanProgress | null;
+  report: ScanReportSummary | null;
+}> = ({ progress, report }) => {
+  const skipped = progress?.skippedItems?.length ? progress.skippedItems : report?.skipped || [];
+  const callsUsed = progress?.serpApiCallsUsed ?? report?.serpApiCallsUsed ?? 0;
+  const budget = progress?.serpApiCallBudget ?? report?.serpApiCallBudget ?? 0;
+  const remaining = Math.max(0, budget - callsUsed);
+
+  if (!progress && !report) return null;
+
+  return (
+    <div className="mt-4 rounded-[24px] border border-dark-700 bg-dark-950/70 p-4 space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-2xl border border-dark-800 bg-dark-900 px-3 py-3">
+          <p className="text-[9px] font-black uppercase tracking-[0.28em] text-gray-500">Calls used</p>
+          <p className="mt-2 text-lg font-black text-white">{callsUsed}</p>
+        </div>
+        <div className="rounded-2xl border border-dark-800 bg-dark-900 px-3 py-3">
+          <p className="text-[9px] font-black uppercase tracking-[0.28em] text-gray-500">Remaining</p>
+          <p className="mt-2 text-lg font-black text-white">{remaining}</p>
+        </div>
+        <div className="rounded-2xl border border-dark-800 bg-dark-900 px-3 py-3">
+          <p className="text-[9px] font-black uppercase tracking-[0.28em] text-gray-500">Skipped</p>
+          <p className="mt-2 text-lg font-black text-white">{progress?.skipped ?? report?.skipped.length ?? 0}</p>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-dark-800 bg-dark-900 px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[9px] font-black uppercase tracking-[0.28em] text-gray-500">Live skip log</p>
+          {report?.budgetExhausted && <span className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-400">Budget reached</span>}
+        </div>
+        {skipped.length === 0 ? (
+          <p className="mt-3 text-xs text-gray-500">No products skipped yet.</p>
+        ) : (
+          <div className="mt-3 max-h-52 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+            {skipped.map((item, index) => (
+              <div key={`${item.name}-${item.reason}-${index}`} className="rounded-xl border border-dark-800 bg-dark-950 px-3 py-2">
+                <p className="truncate text-xs font-bold text-white">{item.name}</p>
+                <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-brand-400">{item.reason.replace(/_/g, ' ')}</p>
+                {item.detail && <p className="mt-1 text-[11px] leading-relaxed text-gray-500">{item.detail}</p>}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
