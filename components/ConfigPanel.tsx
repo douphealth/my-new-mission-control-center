@@ -482,7 +482,8 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ onSave, initialConfig 
   }, []);
 
   const handleTestConnection = useCallback(async () => {
-    const validation = validateConfig(config, 'wp');
+    const normalizedConfig = sanitizeAppConfig(config);
+    const validation = validateConfig(normalizedConfig, 'wp');
 
     if (!validation.isValid) {
       setValidationErrors(validation.errors);
@@ -494,7 +495,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ onSave, initialConfig 
     setValidationErrors({});
 
     try {
-      const result = await testConnection(config);
+      const result = await testConnection(normalizedConfig);
 
       if (result.success) {
         setTestConnectionStatus('success');
@@ -511,9 +512,10 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ onSave, initialConfig 
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedConfig = sanitizeAppConfig(config);
     
     // Validate current tab
-    const validation = validateConfig(config, activeTab);
+    const validation = validateConfig(normalizedConfig, activeTab);
     if (!validation.isValid) {
       setValidationErrors(validation.errors);
             toast.error('Please fix validation errors');
@@ -524,7 +526,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ onSave, initialConfig 
 
     try {
       // Encrypt sensitive fields using async AES-GCM before saving
-      const encryptedConfig = await encryptConfigAsync(config);
+      const encryptedConfig = await encryptConfigAsync(normalizedConfig);
       onSave(encryptedConfig);
       setIsOpen(false);
       toast.success('✓ Configuration Saved');
