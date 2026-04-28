@@ -2529,8 +2529,9 @@ class SerpApiError extends Error {
   }
 }
 
-const HARDCODED_SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://ousxeycrhvuwaejhpqgv.supabase.co';
-const HARDCODED_SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im91c3hleWNyaHZ1d2FlamhwcWd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwNDg3NDgsImV4cCI6MjA4NTYyNDc0OH0.T3abJctCxKFrtkbusDGMursbZXP768sWxz3_yIi9lIc';
+// Use the project's configured Supabase client — single source of truth for URL + auth.
+// This guarantees we hit the SAME project where the serpapi-proxy edge function is deployed.
+import { supabase as _supabaseClient } from './src/integrations/supabase/client';
 
 const callSerpApiProxy = async (params: {
   type: 'search' | 'product';
@@ -2542,56 +2543,54 @@ const callSerpApiProxy = async (params: {
     throw new SerpApiError('SerpAPI key is required. Add it in Settings.', 0, true);
   }
 
-  // ALWAYS use the Supabase Edge Function proxy — never call SerpAPI directly
-  const edgeFunctionUrl = `${HARDCODED_SUPABASE_URL}/functions/v1/serpapi-proxy`;
-  
-  let response: Response;
   let lastError: Error | null = null;
-  
+
   // Retry with exponential backoff (max 3 attempts)
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      response = await fetchWithTimeout(edgeFunctionUrl, 30000, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${HARDCODED_SUPABASE_KEY}`,
-        },
-        body: JSON.stringify(params),
+      const { data, error } = await _supabaseClient.functions.invoke('serpapi-proxy', {
+        body: params,
       });
 
-      if (response.ok) {
-        return response.json();
-      }
+      if (!error) {
+        // Edge function may return { error: "..." } in body for SerpAPI-side failures
+        if (data && typeof data === 'object' && 'error' in data && data.error) {
+          const status = (data as any).status || 500;
+          if (status === 401 || status === 402 || status === 403) {
+            throw new SerpApiError(String(data.error), status, true);
+          }
+          lastError = new SerpApiError(String(data.error), status, false);
+        } else {
+          return data;
+        }
+      } else {
+        // FunctionsHttpError exposes context.response with the status
+        const status = (error as any)?.context?.response?.status ?? 500;
+        const msg = error.message || `SerpAPI proxy error: ${status}`;
 
-      const errorData = await response.json().catch(() => ({}));
-      const msg = errorData.error || `SerpAPI proxy error: ${response.status}`;
-      
-      // Fatal errors — don't retry
-      if (response.status === 401 || response.status === 402 || response.status === 403) {
-        throw new SerpApiError(msg, response.status, true);
+        if (status === 401 || status === 402 || status === 403) {
+          throw new SerpApiError(msg, status, true);
+        }
+
+        if (status === 429) {
+          const waitMs = Math.pow(2, attempt) * 2000;
+          await new Promise(r => setTimeout(r, waitMs));
+          continue;
+        }
+
+        lastError = new SerpApiError(msg, status, false);
       }
-      
-      // Rate limit — respect Retry-After
-      if (response.status === 429) {
-        const retryAfter = response.headers?.get?.('Retry-After');
-        const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : Math.pow(2, attempt) * 2000;
-        await new Promise(r => setTimeout(r, waitMs));
-        continue;
-      }
-      
-      lastError = new SerpApiError(msg, response.status, false);
     } catch (e: any) {
       if (e instanceof SerpApiError && e.isFatal) throw e;
       lastError = e;
     }
-    
-    // Exponential backoff
+
+    // Exponential backoff between attempts
     if (attempt < 2) {
       await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));
     }
   }
-  
+
   throw lastError || new SerpApiError('SerpAPI proxy failed after retries', 500, false);
 };
 
