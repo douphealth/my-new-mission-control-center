@@ -3,6 +3,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { PremiumProductBox } from '../../components/PremiumProductBox';
 import type { ProductDetails } from '../../types';
+import ogCover from '../assets/og-cover.jpg';
+
+const SITE_URL = 'https://basic-app-canvas.lovable.app';
 
 /* -------------------------------------------------------------------------- */
 /*  SEO                                                                       */
@@ -74,14 +77,21 @@ export const Route = createFileRoute('/')({
       { name: 'description', content: DESCRIPTION },
       { property: 'og:title', content: TITLE },
       { property: 'og:description', content: DESCRIPTION },
+      { property: 'og:url', content: SITE_URL },
+      { property: 'og:image', content: `${SITE_URL}${ogCover}` },
+      { property: 'og:image:width', content: '1216' },
+      { property: 'og:image:height', content: '640' },
+      { name: 'twitter:card', content: 'summary_large_image' },
       { name: 'twitter:title', content: TITLE },
       { name: 'twitter:description', content: DESCRIPTION },
+      { name: 'twitter:image', content: `${SITE_URL}${ogCover}` },
       {
         name: 'keywords',
         content:
           'amazon affiliate automation, wordpress affiliate plugin, amazon product box, affiliate seo, sitemap scanner, ai affiliate content, schema product, affiliate marketing software',
       },
     ],
+    links: [{ rel: 'canonical', href: SITE_URL }],
     scripts: [
       {
         type: 'application/ld+json',
