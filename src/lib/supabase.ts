@@ -172,8 +172,7 @@ export function setSupabaseConfig(url: string, anonKey: string): void {
         realtimeChannel.unsubscribe();
         realtimeChannel = null;
     }
-    schemaAvailability = null;
-    schemaErrors = [];
+    refreshSupabaseSchemaState();
     supabaseClient = null;
 }
 
@@ -185,8 +184,7 @@ export function clearSupabaseConfig(): void {
         realtimeChannel.unsubscribe();
         realtimeChannel = null;
     }
-    schemaAvailability = null;
-    schemaErrors = [];
+    refreshSupabaseSchemaState();
     supabaseClient = null;
 }
 
