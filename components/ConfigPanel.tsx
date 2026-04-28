@@ -644,6 +644,27 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ onSave, initialConfig 
         helpText="Optional: For enhanced product data lookup"
       />
 
+      <div className="grid grid-cols-2 gap-4">
+        <InputField
+          label="Call budget"
+          type="number"
+          value={String(config.serpApiCallBudget ?? 8)}
+          onChange={v => updateConfig('serpApiCallBudget', Math.max(1, Math.min(50, parseInt(v, 10) || 8)))}
+          error={validationErrors.serpApiCallBudget}
+          icon="fa-gauge-high"
+          helpText="Hard cap on SerpAPI requests per scan"
+        />
+        <InputField
+          label="Min candidate score"
+          type="number"
+          value={String(config.serpApiMinCandidateScore ?? 35)}
+          onChange={v => updateConfig('serpApiMinCandidateScore', Math.max(0, Math.min(100, parseInt(v, 10) || 35)))}
+          error={validationErrors.serpApiMinCandidateScore}
+          icon="fa-filter"
+          helpText="Higher = fewer, more selective product lookups"
+        />
+      </div>
+
       <InfoBox type="warning" icon="fa-triangle-exclamation">
         SerpApi key enables accurate product images and real-time pricing. 
         Get one at <a href="https://serpapi.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-300">serpapi.com</a>
