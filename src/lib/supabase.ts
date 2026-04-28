@@ -130,6 +130,7 @@ export function setSupabaseConfig(url: string, anonKey: string): void {
         realtimeChannel = null;
     }
     schemaAvailability = null;
+    schemaErrors = [];
     supabaseClient = null;
 }
 
@@ -142,6 +143,7 @@ export function clearSupabaseConfig(): void {
         realtimeChannel = null;
     }
     schemaAvailability = null;
+    schemaErrors = [];
     supabaseClient = null;
 }
 
@@ -368,6 +370,7 @@ export async function pushToSupabase(options?: { mirrorDeletes?: boolean }): Pro
             }]);
         }
 
+        markLastSyncNow();
         syncCallbacks.forEach(cb => cb());
         return { success: true, synced: totalSynced };
     } catch (e: any) {
@@ -439,6 +442,7 @@ export async function pullFromSupabase(): Promise<{ success: boolean; synced: nu
 
         const removedDuplicates = await deduplicateAll();
         markCloudBaselineReady();
+        markLastSyncNow();
         syncCallbacks.forEach(cb => cb());
         return { success: true, synced: totalAdded + totalUpdated + removedDuplicates, added: totalAdded, updated: totalUpdated };
     } catch (e: any) {
