@@ -606,6 +606,7 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
   const runDeepScan = useCallback(async () => {
     setStatus('analyzing');
     setScanProgress({ stage: 'Initializing scan…', current: 0, total: 6 });
+    setScanReport(null);
 
     try {
       if (!config.aiProvider) throw new Error('AI provider not configured. Please configure AI settings.');
@@ -963,6 +964,7 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
             </button>
 
             <ScanProgressOverlay progress={scanProgress} />
+            <ScanTelemetryPanel progress={scanProgress} report={scanReport} />
           </div>
 
           {/* ---- MANUAL ADD CARD ---- */}
