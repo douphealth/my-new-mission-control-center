@@ -275,6 +275,7 @@ export const SitemapScanner: React.FC<SitemapScannerProps> = ({
             
             {/* Debug Button */}
             <button
+              type="button"
               onClick={showDebugInfo}
               className="text-gray-600 hover:text-gray-400 text-xs"
               title="Show debug info"
@@ -299,6 +300,7 @@ export const SitemapScanner: React.FC<SitemapScannerProps> = ({
             
             {/* Sitemap Discover Button */}
             <button
+              type="button"
               onClick={handleSitemapFetch}
               disabled={status === 'scanning' || status === 'auditing' || !sitemapUrl.trim()}
               className="px-8 py-4 bg-gradient-to-r from-brand-600 to-emerald-600 hover:from-brand-500 hover:to-emerald-500 text-white font-black rounded-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-xl hover:shadow-brand-500/25"
@@ -325,6 +327,7 @@ export const SitemapScanner: React.FC<SitemapScannerProps> = ({
 
             {/* WordPress API Button */}
             <button
+              type="button"
               onClick={handleWordPressAPI}
               disabled={status === 'scanning' || status === 'auditing'}
               className="px-6 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all disabled:opacity-50 flex items-center gap-2"
@@ -347,6 +350,7 @@ export const SitemapScanner: React.FC<SitemapScannerProps> = ({
 
             {/* Manual Add Button */}
             <button
+              type="button"
               onClick={() => setShowManualAdd(true)}
               disabled={status === 'scanning' || status === 'auditing'}
               className="px-6 py-4 bg-dark-800 hover:bg-dark-700 text-white font-bold rounded-2xl transition-all border border-dark-700 hover:border-green-500/50 disabled:opacity-50 flex items-center gap-2"
@@ -500,6 +504,7 @@ export const SitemapScanner: React.FC<SitemapScannerProps> = ({
               </p>
               <div className="flex justify-center gap-3">
                 <button
+                  type="button"
                   onClick={() => setSitemapUrl('example.com')}
                   className="px-4 py-2 bg-dark-800 hover:bg-dark-700 text-gray-400 hover:text-white rounded-lg text-sm transition-all"
                 >
