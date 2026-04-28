@@ -1,25 +1,23 @@
-import { defineConfig, loadEnv } from 'vite';
-import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite';
+import { tanstackStart } from '@tanstack/react-start/plugin/vite';
+import tsConfigPaths from 'vite-tsconfig-paths';
+import tailwindcss from '@tailwindcss/vite';
 import { componentTagger } from 'lovable-tagger';
 
-// https://vitejs.dev/config/
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, '.', '');
-
-  return {
-    plugins: [
-      react(),
-      mode === 'development' && componentTagger(),
-    ].filter(Boolean),
-    root: '.',
-    build: {
-      outDir: 'dist',
-      emptyOutDir: true,
-    },
-    server: {
-      host: '0.0.0.0',
-      port: 8080,
-      allowedHosts: true,
-    },
-  };
-});
+export default defineConfig(({ mode }) => ({
+  plugins: [
+    tsConfigPaths({ projects: ['./tsconfig.json'] }),
+    tailwindcss(),
+    tanstackStart({
+      target: 'cloudflare-module',
+      customViteReactPlugin: false,
+      tsr: { srcDirectory: 'src' },
+    }),
+    mode === 'development' && componentTagger(),
+  ].filter(Boolean),
+  server: {
+    host: '0.0.0.0',
+    port: 8080,
+    allowedHosts: true,
+  },
+}));
