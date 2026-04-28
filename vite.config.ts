@@ -1,5 +1,4 @@
 import { defineConfig } from "vite";
-import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
@@ -7,7 +6,6 @@ import { componentTagger } from "lovable-tagger";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const plugins = [
-    ...tanstackStart({ client: { entry: "client" } }),
     react(),
     ...(mode === "development" ? [componentTagger()] : []),
   ] as any;
