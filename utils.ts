@@ -2270,6 +2270,7 @@ export const analyzeContentAndFindProduct = async (
         comparison,
         contentType: 'informational',
         monetizationPotential: refinedQuickProducts.length >= 3 ? 'high' : 'medium',
+        scanReport: tracker.finalize(),
       };
     }
   }
