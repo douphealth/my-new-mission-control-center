@@ -32,6 +32,7 @@ import {
   BoxStyle
 } from './types';
 import { deduplicateRequest } from './lib/request-dedup';
+import { supabase } from './src/integrations/supabase/client';
 
 // ============================================================================
 // CACHE & STORAGE CLASSES
@@ -330,7 +331,6 @@ const CACHE_TTL_SHORT_MS = 60 * 60 * 1000; // 1 hour for volatile data
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 1000;
 const MAX_CONCURRENT_REQUESTS = 10;
-const SERPAPI_BASE_URL = 'https://serpapi.com/search.json';
 const MIN_PRODUCTS_PER_ARTICLE = 1;
 const MAX_PRODUCTS_PER_ARTICLE = 4;
 const MIN_WORDS_PER_PRODUCT = 900;
@@ -2869,9 +2869,6 @@ const generateDefaultFaqs = (productTitle: string): FAQItem[] => {
 // SERPAPI AMAZON SEARCH - VIA EDGE FUNCTION (CORS BYPASS)
 // ============================================================================
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
-
 /**
  * Get raw API key - just return it as-is
  * NOTE: API keys are stored plain text in localStorage, NOT encrypted
@@ -2891,6 +2888,56 @@ class SerpApiError extends Error {
     this.isFatal = isFatal;
   }
 }
+
+const executeDirectSerpApiRequest = async (params: {
+  type: 'search' | 'product';
+  query?: string;
+  asin?: string;
+  apiKey: string;
+}): Promise<any> => {
+  const url = new URL('https://serpapi.com/search.json');
+  url.searchParams.set('api_key', params.apiKey.trim());
+  url.searchParams.set('amazon_domain', 'amazon.com');
+
+  if (params.type === 'product') {
+    url.searchParams.set('engine', 'amazon_product');
+    url.searchParams.set('asin', params.asin!.trim());
+  } else {
+    url.searchParams.set('engine', 'amazon');
+    url.searchParams.set('k', params.query!.trim());
+    url.searchParams.set('num', String(SEARCH_RESULTS_LIMIT));
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
+
+    let data: any = null;
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
+
+    if (!response.ok) {
+      throw new SerpApiError(
+        data?.error || `SerpAPI request failed: ${response.status}`,
+        response.status,
+        response.status === 401 || response.status === 402 || response.status === 403,
+      );
+    }
+
+    return data;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
 
 const callSerpApiProxy = async (params: {
   type: 'search' | 'product';
@@ -2912,23 +2959,15 @@ const callSerpApiProxy = async (params: {
     );
   }
 
-  const url = new URL(SERPAPI_BASE_URL);
-  url.searchParams.set('api_key', params.apiKey.trim());
-  url.searchParams.set('amazon_domain', 'amazon.com');
+  const trimmedQuery = params.query?.trim();
+  const trimmedAsin = params.asin?.trim();
 
-  if (params.type === 'product') {
-    if (!params.asin?.trim()) {
-      throw new SerpApiError('ASIN is required for product lookup.', 0, true);
-    }
-    url.searchParams.set('engine', 'amazon_product');
-    url.searchParams.set('asin', params.asin.trim());
-  } else {
-    if (!params.query?.trim()) {
-      throw new SerpApiError('Search query is required for Amazon lookup.', 0, true);
-    }
-    url.searchParams.set('engine', 'amazon');
-    url.searchParams.set('k', params.query.trim());
-    url.searchParams.set('num', String(SEARCH_RESULTS_LIMIT));
+  if (params.type === 'product' && !trimmedAsin) {
+    throw new SerpApiError('ASIN is required for product lookup.', 0, true);
+  }
+
+  if (params.type === 'search' && !trimmedQuery) {
+    throw new SerpApiError('Search query is required for Amazon lookup.', 0, true);
   }
 
   let lastError: Error | null = null;
@@ -2936,26 +2975,62 @@ const callSerpApiProxy = async (params: {
 
   for (let attempt = 0; attempt < SERPAPI_MAX_ATTEMPTS; attempt++) {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
-
-      const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: { Accept: 'application/json' },
-        signal: controller.signal,
+      const { data, error } = await supabase.functions.invoke('serpapi-proxy', {
+        body: {
+          type: params.type,
+          query: trimmedQuery,
+          asin: trimmedAsin,
+          apiKey: params.apiKey.trim(),
+        },
       });
-      clearTimeout(timeoutId);
 
-      let data: any = null;
-      try {
-        data = await response.json();
-      } catch {
-        data = null;
-      }
+      if (error) {
+        const response = (error as { context?: Response }).context;
+        const status = response?.status ?? (error.name === 'FunctionsFetchError' ? 503 : 500);
+        let msg = error.message || 'Failed to reach SerpAPI proxy.';
 
-      if (!response.ok) {
-        const status = response.status;
-        const msg = data?.error || `SerpAPI request failed: ${status}`;
+        if (response) {
+          try {
+            const payload = await response.clone().json();
+            if (payload?.error) msg = String(payload.error);
+          } catch {
+            try {
+              const text = await response.clone().text();
+              if (text) msg = text;
+            } catch {
+              // no-op
+            }
+          }
+        } else if (error.name === 'FunctionsRelayError' || error.name === 'FunctionsFetchError') {
+          msg = 'Failed to send a request to the Edge Function.';
+        }
+
+        const shouldFallbackToDirectSerpApi =
+          status === 404 ||
+          error.name === 'FunctionsFetchError' ||
+          error.name === 'FunctionsRelayError' ||
+          /Requested function was not found/i.test(msg) ||
+          /Edge Function/i.test(msg);
+
+        if (shouldFallbackToDirectSerpApi) {
+          if (params.tracker) {
+            params.tracker.emit(
+              'serpapi_proxy_fallback',
+              'Supabase SerpAPI proxy unavailable — falling back to direct lookup for this scan.',
+            );
+          }
+          const fallbackData = await executeDirectSerpApiRequest({
+            type: params.type,
+            query: trimmedQuery,
+            asin: trimmedAsin,
+            apiKey: params.apiKey,
+          });
+          if (params.tracker) {
+            params.tracker.recordCall(retriesUsed);
+            params.tracker.recordSuccess();
+          }
+          return fallbackData;
+        }
 
         // Fatal — never retry, never count as transient failure for the
         // budget tracker; the caller will surface the error and stop.
