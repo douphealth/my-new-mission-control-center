@@ -2530,9 +2530,8 @@ class SerpApiError extends Error {
   }
 }
 
-// Use the project's configured Supabase client — single source of truth for URL + auth.
-// This guarantees we hit the SAME project where the serpapi-proxy edge function is deployed.
-import { supabase as _supabaseClient } from './src/integrations/supabase/client';
+// Uses the project's configured Supabase client (imported at top) — single source of truth
+// for URL + auth, guaranteeing we hit the project where serpapi-proxy is deployed.
 
 const callSerpApiProxy = async (params: {
   type: 'search' | 'product';
