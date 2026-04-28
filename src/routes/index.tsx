@@ -1,17 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import App from "../App";
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Blank App" },
-      { name: "description", content: "A blank app canvas" },
-      { property: "og:title", content: "Blank App" },
-      { property: "og:description", content: "A blank app canvas" },
+      { title: "Mission Control" },
+      { name: "description", content: "Mission Control dashboard" },
+      { property: "og:title", content: "Mission Control" },
+      { property: "og:description", content: "Mission Control dashboard" },
     ],
   }),
   component: Index,
 });
 
 function Index() {
-  return <main className="min-h-screen bg-background" />;
+  return <App />;
 }
