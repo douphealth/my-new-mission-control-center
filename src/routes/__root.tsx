@@ -10,6 +10,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { ErrorBoundary } from 'react-error-boundary';
 import { Toaster } from 'sonner';
 import appCss from '../styles.css?url';
+import { AuthProvider } from '../lib/auth';
 
 interface RouterContext {
   queryClient: QueryClient;
