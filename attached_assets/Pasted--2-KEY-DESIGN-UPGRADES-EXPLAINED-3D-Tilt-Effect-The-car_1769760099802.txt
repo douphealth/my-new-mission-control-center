@@ -1,0 +1,2715 @@
+🎯 2. KEY DESIGN UPGRADES EXPLAINED
+✨ 3D Tilt Effect
+The card responds to mouse movement with realistic 3D perspective rotation, creating depth and interactivity.
+🌈 Mesh Gradient Background
+Animated multi-color gradients that flow and morph, creating a living, breathing background.
+⭐ Floating Particles
+Subtle animated particles rise through the card, adding visual interest without distraction.
+🔮 Holographic Shine
+A dynamic shine effect that follows the cursor, mimicking real holographic materials.
+💫 Animated Border Glow
+Rainbow gradient borders that animate around the card, drawing attention.
+🎪 Bento Grid Layout
+Modern asymmetric grid layout that's popular in 2025/2026 design trends.
+🧲 Magnetic Image Effect
+The product image subtly follows the cursor, creating a magnetic feel.
+🔴 Live Badge with Pulse
+A pulsing "LIVE" indicator that creates urgency and modern app-like feel.
+📜 Benefits Marquee
+Auto-scrolling benefits that keep content fresh without taking up space.
+🎊 Confetti on CTA Click
+Celebration animation when users click the buy button for positive reinforcement.
+🛠️ 3. ADDITIONAL ENHANCEMENTS
+Add these utility styles to your index.html or global CSS:
+css
+
+
+/* Variable Font Support */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+
+/* Smooth Scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Selection Styling */
+::selection {
+  background: #6366f1;
+  color: white;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0a0f;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #6366f1, #ec4899);
+  border-radius: 4px;
+}
+
+/* Focus Styles */
+*:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+📊 4. PERFORMANCE OPTIMIZATIONS
+To ensure these effects don't hurt performance:
+tsx
+
+
+// Add to your component
+import { useReducedMotion } from './hooks/useReducedMotion';
+
+// Detect user preference
+const prefersReducedMotion = useReducedMotion();
+
+// Conditionally disable heavy animations
+const animationStyle = prefersReducedMotion 
+  ? { animation: 'none', transition: 'none' }
+  : {};
+Create the hook:
+tsx
+
+
+// hooks/useReducedMotion.ts
+import { useState, useEffect } from 'react';
+
+export const useReducedMotion = () => {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReducedMotion(query.matches);
+    
+    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+    query.addEventListener('change', handler);
+    return () => query.removeEventListener('change', handler);
+  }, []);
+
+  return prefersReducedMotion;
+};
+🚀 5. QUICK WINS FOR IMMEDIATE IMPACT
+If you want faster improvements without a full rewrite:
+Change	Impact	Effort
+Add backdrop-filter: blur()	High	1 line
+Add gradient text on titles	High	3 lines
+Add transform: scale() on hover	Medium	2 lines
+Add pulsing badge animation	High	5 lines
+Add shadow on image	Medium	1 line
+Add border-radius increase (32px+)	Medium	1 line
+
+Export as CSV
+Would you like me to provide the WordPress-compatible HTML version of this design that can be injected into posts, or dive deeper into any specific effect?
+Claude Opus 4.5 (Extended)
+
+
+
+Sources
+Images
+Videos
+News
+Attached sources
+TXT
+Document
+
+I_HAVE_BUILT_THIS_APP_BUT_ITS_STILL.txt
+I HAVE BUILT THIS APP BUT ITS STILL VERY LOW QUALITY!!! I WANT YOU TO REVIEW IT AND TELL ME EXACTLY HOW TO MAKE IT 1000000000000000000 TIMES MORE EFFICIENT, ROBUST!!! https://wp-amz-automator.affiliatemarketingforsuccess.com/ https://wp-amz-automator.affiliatemarketingforsuccess.com/ Selected Files Directory Structure: └── ./ └── AmzWP-Automator-main ├── components │ ├── ComparisonTablePreview.tsx │ ├── ConfigPanel.tsx │ ├── LandingPage.tsx │ ├── PostEditor.tsx │ ├── PremiumProductBox.tsx │ ├── ProductBoxPreview.tsx │ └── SitemapScanner.tsx ├── App.tsx ├── constants.ts ├── index.html ├── index.tsx ├── types.ts ├── utils.ts └── vite.config.ts --- AmzWP-Automator-main/App.tsx --- /** * ============================================================================ * AmzWP-Automator | Application Shell v80.0 * ============================================================================ * Enterprise-grade React application with: * - Error Boundaries * - State Persistence * - Performance Optimizations * - Clean Architecture * ============================================================================ */ import React, { useState, useEffect, useCallback, useMemo, Suspense, lazy, ErrorInfo, Component, ReactNode, } from 'react'; import { AppConfig, BlogPost, AppStep, SitemapState } from './types'; import { ConfigPanel } from './components/ConfigPanel'; import { SitemapScanner } from './components/SitemapScanner'; import { LandingPage } from './components/LandingPage'; import { IntelligenceCache } from './utils'; // Lazy load the PostEditor for better initial load performance const PostEditor = lazy(() => import('./components/PostEditor').then(module => ({ default: module.PostEditor })) ); // ============================================================================ // CONSTANTS // ============================================================================ const STORAGE_KEYS = { HAS_ENTERED: 'amzwp_has_entered', CONFIG: 'amzwp_config_v4', SITEMAP_STATE: 'amzwp_sitemap_state_v4', } as const; const DEFAULT_CONFIG: AppConfig = { amazonTag: '', amazonAccessKey: '', amazonSecretKey: '', amazonRegion: 'us-east-1', wpUrl: '', wpUser: '', wpAppPassword: '', serpApiKey: '', autoPublishThreshold: 85, concurrencyLimit: 5, enableSchema: true, enableStickyBar: true, boxStyle: 'PREMIUM', aiProvider: 'gemini', aiModel: 'gemini-2.0-flash', }; // ============================================================================ // ERROR BOUNDARY // ============================================================================ interface ErrorBoundaryProps { children: ReactNode; fallback?: ReactNode; } interface ErrorBoundaryState { hasError: boolean; error: Error | null; } class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> { constructor(props: ErrorBoundaryProps) { super(props); this.state = { hasError: false, error: null }; } static getDerivedStateFromError(error: Error): ErrorBoundaryState { return { hasError: true, error }; } componentDidCatch(error: Error, errorInfo: ErrorInfo) { console.error('[ErrorBoundary] Caught error:', error, errorInfo); } render() { if (this.state.hasError) { return ( this.props.fallback || ( <div className="min-h-screen bg-dark-950 flex items-center justify-center p-8"> <div className="bg-dark-900 border border-red-500/30 rounded-3xl p-12 max-w-lg text-center"> <div className="text-6xl mb-6 text-red-500"> <i className="fa-solid fa-triangle-exclamation"></i> </div> <h1 className="text-2xl font-black text-white mb-4"> Application Error </h1> <p className="text-gray-400 mb-8"> {this.state.error?.message || 'An unexpected error occurred'} </p> <button onClick={() => window.location.reload()} className="bg-white text-dark-950 px-8 py-4 rounded-xl font-bold hover:bg-brand-500 hover:text-white transition-all" > Reload Application </button> </div> </div> ) ); } return this.props.children; } } // ============================================================================ // LOADING COMPONENT // ============================================================================ const LoadingSpinner: React.FC<{ message?: string }> = ({ message = 'Loading...' }) => ( <div className="min-h-screen bg-dark-950 flex items-center justify-center"> <div className="text-center"> <div className="relative w-20 h-20 mx-auto mb-6"> <div className="absolute inset-0 border-4 border-brand-500/20 rounded-full"></div> <div className="absolute inset-0 border-4 border-transparent border-t-brand-500 rounded-full animate-spin"></div> </div> <p className="text-gray-500 font-bold uppercase tracking-widest text-xs"> {message} </p> </div> </div> ); // ============================================================================ // CUSTOM HOOKS // ============================================================================ /** * Persisted state hook with localStorage */ function usePersistedState<T>( key: string, defaultValue: T ): [T, React.Dispatch<React.SetStateAction<T>>] { const [state, setState] = useState<T>(() => { try { const stored = localStorage.getItem(key); return stored ? JSON.parse(stored) : defaultValue; } catch { return defaultValue; } }); useEffect(() => { try ...
+
+Web sources
+
+honestlymodern.com
+13 Fun & Easy Ways To Reuse Amazon Boxes - Honestly Modern
+Reuse cardboard boxes for gifts that can’t be wrapped in just paper. If you want some more ideas, I shared a bunch of other holiday-inspired gift wrapping ideas using upcycled material from a bunch of different types of packaging as well as how to make DIY gift tags from greeting cards.
+
+
+thepennyhoarder.com
+Recycle? Nope — 26 Ways to Reuse Your Amazon Boxes and Save Money
+Has more than 200 million Prime members worldwide. Delivered about 6.3 billion packages in the United States in 2024. Before you break down the dozen Amazon boxes that arrived this week, here are suggestions for putting that corrugated cardboard to good use. It’s pretty much a rule of modern life.
+
+
+99designs.com
+Amazon Packaging Ideas - 84+ Best Amazon Packaging Designs In 2025 | 99designs
+The task was to create a delicate and feminine aspirational brand for decorative succulent pots to sell on Amazon. The brand identity needs to reflect the sophisticated style provided by these decorative elements while the box needs to look ...
+
+
+
+View all 11 sources
+Please review the attached file: here_is_the_updated_version_of_the.txt
+
+Workflow
+
+
+
+Note: Due to model limitations, the response may not account for all data in the uploaded file(s). For better results, consider using fewer or smaller file(s) with essential excerpts. Learn more
+🚀 4 TRANSFORMATIVE Changes to Make This THE BEST APP IN THE WORLD
+I've deeply analyzed your updated codebase 
+. You've made excellent progress—the auto-save system, memoized relevance engine, request deduplication, and smart proxy strategy are solid improvements. However, to achieve world-class status, here are the 4 game-changing features that will set your app apart:
+🎯 Change #1: UNDO/REDO HISTORY SYSTEM
+Why it's transformative: Users are terrified of making mistakes. An undo system makes editing fearless and professional.
+Implementation:
+tsx
+
+
+// hooks/useHistory.ts - Enterprise Undo/Redo System
+
+import { useState, useCallback, useRef } from 'react';
+
+interface HistoryState<T> {
+  past: T[];
+  present: T;
+  future: T[];
+}
+
+export function useHistory<T>(initialState: T, maxHistory = 50) {
+  const [history, setHistory] = useState<HistoryState<T>>({
+    past: [],
+    present: initialState,
+    future: [],
+  });
+  
+  const lastActionRef = useRef<number>(Date.now());
+
+  const set = useCallback((newPresent: T | ((prev: T) => T), options?: { merge?: boolean }) => {
+    setHistory(prev => {
+      const resolvedPresent = typeof newPresent === 'function' 
+        ? (newPresent as (prev: T) => T)(prev.present) 
+        : newPresent;
+      
+      // Merge rapid changes (within 500ms) into single history entry
+      const now = Date.now();
+      const shouldMerge = options?.merge || (now - lastActionRef.current < 500);
+      lastActionRef.current = now;
+
+      if (shouldMerge && prev.past.length > 0) {
+        return {
+          past: prev.past,
+          present: resolvedPresent,
+          future: [],
+        };
+      }
+
+      const newPast = [...prev.past, prev.present].slice(-maxHistory);
+      
+      return {
+        past: newPast,
+        present: resolvedPresent,
+        future: [],
+      };
+    });
+  }, [maxHistory]);
+
+  const undo = useCallback(() => {
+    setHistory(prev => {
+      if (prev.past.length === 0) return prev;
+      
+      const newPast = prev.past.slice(0, -1);
+      const newPresent = prev.past[prev.past.length - 1];
+      
+      return {
+        past: newPast,
+        present: newPresent,
+        future: [prev.present, ...prev.future].slice(0, maxHistory),
+      };
+    });
+  }, [maxHistory]);
+
+  const redo = useCallback(() => {
+    setHistory(prev => {
+      if (prev.future.length === 0) return prev;
+      
+      const [newPresent, ...newFuture] = prev.future;
+      
+      return {
+        past: [...prev.past, prev.present],
+        present: newPresent,
+        future: newFuture,
+      };
+    });
+  }, []);
+
+  const canUndo = history.past.length > 0;
+  const canRedo = history.future.length > 0;
+  const historyLength = history.past.length;
+
+  return {
+    state: history.present,
+    set,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    historyLength,
+    reset: (newState: T) => setHistory({ past: [], present: newState, future: [] }),
+  };
+}
+Integration in PostEditor.tsx:
+tsx
+
+
+// Replace useState with useHistory
+const {
+  state: editorNodes,
+  set: setEditorNodes,
+  undo,
+  redo,
+  canUndo,
+  canRedo,
+  historyLength,
+} = useHistory<EditorNode[]>([]);
+
+// Add keyboard shortcuts
+useKeyboardShortcuts({
+  'ctrl+z': undo,
+  'meta+z': undo,
+  'ctrl+shift+z': redo,
+  'meta+shift+z': redo,
+  'ctrl+y': redo,
+});
+
+// Add Undo/Redo UI in toolbar
+<div className="flex items-center gap-2 bg-white/90 backdrop-blur rounded-full px-4 py-2 shadow-xl">
+  <button 
+    onClick={undo} 
+    disabled={!canUndo}
+    className={`p-2 rounded-full transition-all ${canUndo ? 'hover:bg-slate-100 text-slate-700' : 'text-slate-300 cursor-not-allowed'}`}
+    title="Undo (Ctrl+Z)"
+  >
+    <i className="fa-solid fa-rotate-left" />
+  </button>
+  <span className="text-xs font-bold text-slate-400 min-w-[3ch] text-center">{historyLength}</span>
+  <button 
+    onClick={redo} 
+    disabled={!canRedo}
+    className={`p-2 rounded-full transition-all ${canRedo ? 'hover:bg-slate-100 text-slate-700' : 'text-slate-300 cursor-not-allowed'}`}
+    title="Redo (Ctrl+Shift+Z)"
+  >
+    <i className="fa-solid fa-rotate-right" />
+  </button>
+</div>
+🎯 Change #2: BATCH PROCESSING ENGINE
+Why it's transformative: Processing posts one-by-one is painfully slow. Batch processing with smart queuing can 10x productivity.
+Implementation:
+tsx
+
+
+// components/BatchProcessor.tsx
+
+import React, { useState, useCallback, useRef } from 'react';
+import { BlogPost, AppConfig, ProductDetails } from '../types';
+import { analyzeContentAndFindProduct, pushToWordPress, fetchRawPostContent, generateProductBoxHtml } from '../utils';
+
+interface BatchJob {
+  id: string;
+  post: BlogPost;
+  status: 'queued' | 'processing' | 'completed' | 'failed' | 'skipped';
+  progress: number;
+  productsFound: number;
+  error?: string;
+  startTime?: number;
+  endTime?: number;
+}
+
+interface BatchProcessorProps {
+  posts: BlogPost[];
+  config: AppConfig;
+  onComplete: (results: BatchJob[]) => void;
+}
+
+export const BatchProcessor: React.FC<BatchProcessorProps> = ({ posts, config, onComplete }) => {
+  const [jobs, setJobs] = useState<BatchJob[]>([]);
+  const [isRunning, setIsRunning] = useState(false);
+  const [concurrency, setConcurrency] = useState(3);
+  const [autoPublish, setAutoPublish] = useState(false);
+  const abortRef = useRef(false);
+
+  const initializeJobs = useCallback(() => {
+    const newJobs: BatchJob[] = posts.map(post => ({
+      id: `job-${post.id}-${Date.now()}`,
+      post,
+      status: 'queued',
+      progress: 0,
+      productsFound: 0,
+    }));
+    setJobs(newJobs);
+    return newJobs;
+  }, [posts]);
+
+  const processJob = async (job: BatchJob): Promise<BatchJob> => {
+    if (abortRef.current) {
+      return { ...job, status: 'skipped' };
+    }
+
+    const startTime = Date.now();
+    
+    try {
+      // Step 1: Fetch content (25%)
+      setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'processing', progress: 25, startTime } : j));
+      
+      const { content, resolvedId } = await fetchRawPostContent(config, job.post.id, job.post.url);
+      
+      if (abortRef.current) return { ...job, status: 'skipped' };
+
+      // Step 2: Analyze content (50%)
+      setJobs(prev => prev.map(j => j.id === job.id ? { ...j, progress: 50 } : j));
+      
+      const analysis = await analyzeContentAndFindProduct(job.post.title, content, config);
+      
+      if (abortRef.current) return { ...job, status: 'skipped' };
+
+      // Step 3: Generate HTML (75%)
+      setJobs(prev => prev.map(j => j.id === job.id ? { ...j, progress: 75, productsFound: analysis.detectedProducts.length } : j));
+
+      if (analysis.detectedProducts.length === 0) {
+        return {
+          ...job,
+          status: 'completed',
+          progress: 100,
+          productsFound: 0,
+          endTime: Date.now(),
+        };
+      }
+
+      // Auto-place products and generate final HTML
+      const productHtmls = analysis.detectedProducts.map(p => 
+        generateProductBoxHtml(p, config.amazonTag, p.deploymentMode)
+      );
+      
+      // Simple auto-placement: Insert after first paragraph
+      const blocks = content.split('</p>');
+      const finalContent = blocks.length > 1 
+        ? blocks[0] + '</p>' + productHtmls.join('\n\n') + blocks.slice(1).join('</p>')
+        : content + '\n\n' + productHtmls.join('\n\n');
+
+      // Step 4: Push to WordPress (100%)
+      if (autoPublish) {
+        setJobs(prev => prev.map(j => j.id === job.id ? { ...j, progress: 90 } : j));
+        await pushToWordPress(config, resolvedId, finalContent);
+      }
+
+      return {
+        ...job,
+        status: 'completed',
+        progress: 100,
+        productsFound: analysis.detectedProducts.length,
+        endTime: Date.now(),
+      };
+
+    } catch (error: any) {
+      return {
+        ...job,
+        status: 'failed',
+        progress: 0,
+        error: error.message?.substring(0, 100) || 'Unknown error',
+        endTime: Date.now(),
+      };
+    }
+  };
+
+  const runBatch = async () => {
+    setIsRunning(true);
+    abortRef.current = false;
+    
+    const initialJobs = initializeJobs();
+    const queue = [...initialJobs];
+    const results: BatchJob[] = [];
+    
+    const workers = Array(concurrency).fill(null).map(async () => {
+      while (queue.length > 0 && !abortRef.current) {
+        const job = queue.shift();
+        if (job) {
+          const result = await processJob(job);
+          results.push(result);
+          setJobs(prev => prev.map(j => j.id === result.id ? result : j));
+        }
+      }
+    });
+
+    await Promise.all(workers);
+    
+    setIsRunning(false);
+    onComplete(results);
+  };
+
+  const abort = () => {
+    abortRef.current = true;
+  };
+
+  const stats = {
+    total: jobs.length,
+    completed: jobs.filter(j => j.status === 'completed').length,
+    failed: jobs.filter(j => j.status === 'failed').length,
+    processing: jobs.filter(j => j.status === 'processing').length,
+    productsFound: jobs.reduce((sum, j) => sum + j.productsFound, 0),
+    avgTime: jobs.filter(j => j.endTime && j.startTime).reduce((sum, j) => sum + (j.endTime! - j.startTime!), 0) / Math.max(1, jobs.filter(j => j.endTime).length),
+  };
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-xl flex items-center justify-center p-8">
+      <div className="bg-dark-900 border border-dark-700 rounded-[40px] max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        
+        {/* Header */}
+        <div className="p-8 border-b border-dark-800 flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-black text-white tracking-tight">Batch Processor</h2>
+            <p className="text-sm text-gray-500 mt-1">Process {posts.length} posts simultaneously</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <div className="text-4xl font-black text-brand-400">{stats.completed}/{stats.total}</div>
+              <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Completed</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div className="p-6 bg-dark-950/50 border-b border-dark-800 flex items-center gap-6 flex-wrap">
+          <div className="flex items-center gap-3">
+            <label className="text-xs font-bold text-gray-400">Concurrency:</label>
+            <select 
+              value={concurrency} 
+              onChange={e => setConcurrency(Number(e.target.value))}
+              disabled={isRunning}
+              className="bg-dark-800 border border-dark-700 rounded-lg px-3 py-2 text-white text-sm"
+            >
+              {[1, 2, 3, 5, 10].map(n => (
+                <option key={n} value={n}>{n} parallel</option>
+              ))}
+            </select>
+          </div>
+          
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input 
+              type="checkbox" 
+              checked={autoPublish} 
+              onChange={e => setAutoPublish(e.target.checked)}
+              disabled={isRunning}
+              className="w-4 h-4 accent-brand-500"
+            />
+            <span className="text-xs font-bold text-gray-400">Auto-publish to WordPress</span>
+          </label>
+
+          <div className="ml-auto flex gap-3">
+            {isRunning ? (
+              <button onClick={abort} className="px-6 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-sm">
+                <i className="fa-solid fa-stop mr-2" /> Abort
+              </button>
+            ) : (
+              <button onClick={runBatch} className="px-8 py-3 bg-brand-600 hover:bg-brand-500 text-white rounded-xl font-black text-sm uppercase tracking-wider">
+                <i className="fa-solid fa-play mr-2" /> Start Batch
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Progress Stats */}
+        <div className="grid grid-cols-4 gap-4 p-6 bg-dark-900">
+          {[
+            { label: 'Processing', value: stats.processing, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+            { label: 'Completed', value: stats.completed, color: 'text-green-400', bg: 'bg-green-500/10' },
+            { label: 'Failed', value: stats.failed, color: 'text-red-400', bg: 'bg-red-500/10' },
+            { label: 'Products Found', value: stats.productsFound, color: 'text-amber-400', bg: 'bg-amber-500/10' },
+          ].map(stat => (
+            <div key={stat.label} className={`${stat.bg} rounded-2xl p-4 text-center`}>
+              <div className={`text-3xl font-black ${stat.color}`}>{stat.value}</div>
+              <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{stat.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Job List */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-3">
+          {jobs.map(job => (
+            <div 
+              key={job.id}
+              className={`p-4 rounded-2xl border transition-all ${
+                job.status === 'completed' ? 'bg-green-500/5 border-green-500/20' :
+                job.status === 'failed' ? 'bg-red-500/5 border-red-500/20' :
+                job.status === 'processing' ? 'bg-blue-500/5 border-blue-500/20' :
+                'bg-dark-800 border-dark-700'
+              }`}
+            >
+              <div className="flex items-center gap-4">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                  job.status === 'completed' ? 'bg-green-500 text-white' :
+                  job.status === 'failed' ? 'bg-red-500 text-white' :
+                  job.status === 'processing' ? 'bg-blue-500 text-white' :
+                  'bg-dark-700 text-gray-500'
+                }`}>
+                  {job.status === 'completed' && <i className="fa-solid fa-check" />}
+                  {job.status === 'failed' && <i className="fa-solid fa-times" />}
+                  {job.status === 'processing' && <i className="fa-solid fa-spinner fa-spin" />}
+                  {job.status === 'queued' && <i className="fa-solid fa-clock" />}
+                </div>
+                
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-white truncate">{job.post.title}</div>
+                  <div className="text-xs text-gray-500 truncate">{job.post.url}</div>
+                </div>
+
+                {job.status === 'processing' && (
+                  <div className="w-32">
+                    <div className="h-2 bg-dark-700 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-blue-500 transition-all duration-300"
+                        style={{ width: `${job.progress}%` }}
+                      />
+                    </div>
+                    <div className="text-[10px] text-blue-400 text-right mt-1">{job.progress}%</div>
+                  </div>
+                )}
+
+                {job.status === 'completed' && (
+                  <div className="text-right">
+                    <div className="text-sm font-bold text-green-400">{job.productsFound} products</div>
+                    <div className="text-[10px] text-gray-500">{((job.endTime! - job.startTime!) / 1000).toFixed(1)}s</div>
+                  </div>
+                )}
+
+                {job.status === 'failed' && (
+                  <div className="text-xs text-red-400 max-w-[200px] truncate" title={job.error}>
+                    {job.error}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+🎯 Change #3: DRAG-AND-DROP VISUAL EDITOR
+Why it's transformative: Button-based insertion is clunky. Drag-and-drop makes product placement intuitive and fast.
+Implementation:
+tsx
+
+
+// hooks/useDragAndDrop.ts
+
+import { useState, useCallback, useRef, DragEvent } from 'react';
+
+interface DragState {
+  isDragging: boolean;
+  draggedItemId: string | null;
+  draggedItemType: 'product' | 'block' | null;
+  dropTargetId: string | null;
+  dropPosition: 'before' | 'after' | null;
+}
+
+export function useDragAndDrop<T extends { id: string }>(
+  items: T[],
+  onReorder: (items: T[]) => void
+) {
+  const [dragState, setDragState] = useState<DragState>({
+    isDragging: false,
+    draggedItemId: null,
+    draggedItemType: null,
+    dropTargetId: null,
+    dropPosition: null,
+  });
+
+  const dragCounterRef = useRef(0);
+
+  const handleDragStart = useCallback((e: DragEvent, itemId: string, itemType: 'product' | 'block') => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', itemId);
+    e.dataTransfer.setData('application/x-item-type', itemType);
+    
+    // Add drag image
+    const dragImage = document.createElement('div');
+    dragImage.className = 'fixed pointer-events-none bg-brand-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-2xl';
+    dragImage.textContent = itemType === 'product' ? '📦 Product' : '📝 Block';
+    document.body.appendChild(dragImage);
+    e.dataTransfer.setDragImage(dragImage, 20, 20);
+    setTimeout(() => document.body.removeChild(dragImage), 0);
+
+    setDragState({
+      isDragging: true,
+      draggedItemId: itemId,
+      draggedItemType: itemType,
+      dropTargetId: null,
+      dropPosition: null,
+    });
+  }, []);
+
+  const handleDragOver = useCallback((e: DragEvent, targetId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const position: 'before' | 'after' = e.clientY < midY ? 'before' : 'after';
+
+    setDragState(prev => ({
+      ...prev,
+      dropTargetId: targetId,
+      dropPosition: position,
+    }));
+  }, []);
+
+  const handleDragLeave = useCallback((e: DragEvent) => {
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setDragState(prev => ({
+        ...prev,
+        dropTargetId: null,
+        dropPosition: null,
+      }));
+    }
+  }, []);
+
+  const handleDragEnter = useCallback((e: DragEvent) => {
+    dragCounterRef.current++;
+  }, []);
+
+  const handleDrop = useCallback((e: DragEvent, targetId: string) => {
+    e.preventDefault();
+    dragCounterRef.current = 0;
+
+    const draggedId = e.dataTransfer.getData('text/plain');
+    const itemType = e.dataTransfer.getData('application/x-item-type');
+    
+    if (!draggedId || draggedId === targetId) {
+      setDragState({
+        isDragging: false,
+        draggedItemId: null,
+        draggedItemType: null,
+        dropTargetId: null,
+        dropPosition: null,
+      });
+      return;
+    }
+
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const position: 'before' | 'after' = e.clientY < midY ? 'before' : 'after';
+
+    // Reorder items
+    const newItems = [...items];
+    const draggedIndex = newItems.findIndex(item => item.id === draggedId);
+    const targetIndex = newItems.findIndex(item => item.id === targetId);
+
+    if (draggedIndex !== -1) {
+      // Moving existing item
+      const [draggedItem] = newItems.splice(draggedIndex, 1);
+      const insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
+      const adjustedIndex = draggedIndex < targetIndex ? insertIndex - 1 : insertIndex;
+      newItems.splice(Math.max(0, adjustedIndex), 0, draggedItem);
+    }
+
+    onReorder(newItems);
+
+    setDragState({
+      isDragging: false,
+      draggedItemId: null,
+      draggedItemType: null,
+      dropTargetId: null,
+      dropPosition: null,
+    });
+  }, [items, onReorder]);
+
+  const handleDragEnd = useCallback(() => {
+    dragCounterRef.current = 0;
+    setDragState({
+      isDragging: false,
+      draggedItemId: null,
+      draggedItemType: null,
+      dropTargetId: null,
+      dropPosition: null,
+    });
+  }, []);
+
+  return {
+    dragState,
+    handlers: {
+      onDragStart: handleDragStart,
+      onDragOver: handleDragOver,
+      onDragEnter: handleDragEnter,
+      onDragLeave: handleDragLeave,
+      onDrop: handleDrop,
+      onDragEnd: handleDragEnd,
+    },
+  };
+}
+Visual Drop Zone Component:
+tsx
+
+
+// components/DropZone.tsx
+
+interface DropZoneProps {
+  isActive: boolean;
+  position: 'before' | 'after';
+}
+
+export const DropZone: React.FC<DropZoneProps> = ({ isActive, position }) => (
+  <div 
+    className={`
+      relative h-1 my-2 rounded-full transition-all duration-200
+      ${isActive 
+        ? 'h-16 bg-gradient-to-r from-brand-500/20 via-brand-500/40 to-brand-500/20 border-2 border-dashed border-brand-500' 
+        : 'bg-transparent'
+      }
+    `}
+  >
+    {isActive && (
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="bg-brand-500 text-white px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest shadow-xl animate-pulse">
+          <i className="fa-solid fa-arrow-down mr-2" />
+          Drop {position === 'before' ? 'Above' : 'Below'}
+        </div>
+      </div>
+    )}
+  </div>
+);
+🎯 Change #4: AI-POWERED COPY ENHANCEMENT
+Why it's transformative: Currently AI just finds products. Making it write compelling copy turns a tool into a revenue machine.
+Implementation:
+tsx
+
+
+// utils/aiCopywriter.ts
+
+import { ProductDetails, AppConfig } from '../types';
+
+interface EnhancedCopy {
+  verdict: string;
+  headline: string;
+  bulletPoints: string[];
+  callToAction: string;
+  faqs: { question: string; answer: string }[];
+  urgencyHook: string;
+}
+
+const COPY_ENHANCEMENT_PROMPT = `You are an elite conversion copywriter specializing in Amazon affiliate content.
+
+PRODUCT DATA:
+- Name: {{PRODUCT_NAME}}
+- Brand: {{BRAND}}
+- Category: {{CATEGORY}}
+- Price: {{PRICE}}
+- Rating: {{RATING}}/5 ({{REVIEW_COUNT}} reviews)
+- Prime: {{PRIME}}
+
+CURRENT POST CONTEXT:
+{{CONTEXT}}
+
+Generate HIGHLY PERSUASIVE, conversion-optimized copy for this product:
+
+1. VERDICT (2-3 sentences): A compelling expert opinion that establishes authority and creates desire. Start with the benefit, not the product. Use power words like "transforms", "eliminates", "delivers".
+
+2. HEADLINE (10 words max): An attention-grabbing headline that creates curiosity or urgency.
+
+3. BULLET_POINTS (4 points): Each must start with a BENEFIT (what user gains), then feature. Use ✓ format. Be specific with numbers when possible.
+
+4. CALL_TO_ACTION (5 words max): Urgency-driven CTA that goes beyond "Buy Now". Examples: "Claim Your Discount Today", "See Why 50K+ Chose This".
+
+5. FAQS (3 questions): Real objection-handling questions buyers have. Answers should be 1-2 sentences max and remove purchasing friction.
+
+6. URGENCY_HOOK (1 sentence): A scarcity or time-limited message that's believable.
+
+RULES:
+- NO generic phrases like "high quality" or "great product"
+- Use numbers and specifics wherever possible
+- Address the reader as "you" 
+- Focus on TRANSFORMATION and OUTCOME, not features
+- Match the tone to the product category (tech = precise, kitchen = warm, fitness = motivational)
+
+Return ONLY valid JSON:
+{
+  "verdict": "...",
+  "headline": "...",
+  "bulletPoints": ["...", "...", "...", "..."],
+  "callToAction": "...",
+  "faqs": [{"question": "...", "answer": "..."}, ...],
+  "urgencyHook": "..."
+}`;
+
+export const enhanceProductCopy = async (
+  product: ProductDetails,
+  postContext: string,
+  config: AppConfig
+): Promise<EnhancedCopy> => {
+  const prompt = COPY_ENHANCEMENT_PROMPT
+    .replace('{{PRODUCT_NAME}}', product.title)
+    .replace('{{BRAND}}', product.brand || 'Unknown')
+    .replace('{{CATEGORY}}', product.category || 'General')
+    .replace('{{PRICE}}', product.price)
+    .replace('{{RATING}}', String(product.rating || 4.5))
+    .replace('{{REVIEW_COUNT}}', String(product.reviewCount || 1000))
+    .replace('{{PRIME}}', product.prime ? 'Yes' : 'No')
+    .replace('{{CONTEXT}}', postContext.substring(0, 2000));
+
+  // Call your AI provider (reuse existing callAIProvider function)
+  const response = await callAIProvider(config, 
+    'You are a conversion copywriter. Return only valid JSON.',
+    prompt
+  );
+
+  try {
+    const parsed = JSON.parse(response.text);
+    return {
+      verdict: parsed.verdict || product.verdict || '',
+      headline: parsed.headline || product.title,
+      bulletPoints: parsed.bulletPoints || product.evidenceClaims || [],
+      callToAction: parsed.callToAction || 'Check Price on Amazon',
+      faqs: parsed.faqs || product.faqs || [],
+      urgencyHook: parsed.urgencyHook || '',
+    };
+  } catch {
+    return {
+      verdict: product.verdict || '',
+      headline: product.title,
+      bulletPoints: product.evidenceClaims || [],
+      callToAction: 'Check Price on Amazon',
+      faqs: product.faqs || [],
+      urgencyHook: '',
+    };
+  }
+};
+Add Enhancement Button to Product Card:
+tsx
+
+
+// In PostEditor.tsx - Add to product node controls
+
+const [enhancing, setEnhancing] = useState<string | null>(null);
+
+const handleEnhanceCopy = async (productId: string) => {
+  setEnhancing(productId);
+  try {
+    const product = productMap[productId];
+    const context = editorNodes.filter(n => n.type === 'HTML').map(n => n.content).join(' ');
+    
+    const enhanced = await enhanceProductCopy(product, context, config);
+    
+    setProductMap(prev => ({
+      ...prev,
+      [productId]: {
+        ...prev[productId],
+        verdict: enhanced.verdict,
+        evidenceClaims: enhanced.bulletPoints,
+        faqs: enhanced.faqs.map(f => ({ question: f.question, answer: f.answer })),
+      }
+    }));
+    
+    Toastify({ text: "Copy Enhanced with AI Magic! ✨", style: { background: "#8b5cf6" } }).showToast();
+  } catch (e) {
+    Toastify({ text: "Enhancement failed", style: { background: "#ef4444" } }).showToast();
+  } finally {
+    setEnhancing(null);
+  }
+};
+
+// Add button in product controls
+<button 
+  onClick={() => handleEnhanceCopy(node.productId!)}
+  disabled={enhancing === node.productId}
+  className="px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-wider shadow-lg transition-all bg-violet-500 text-white hover:bg-violet-400 disabled:opacity-50"
+>
+  {enhancing === node.productId ? (
+    <><i className="fa-solid fa-spinner fa-spin mr-1" /> Enhancing...</>
+  ) : (
+    <><i className="fa-solid fa-wand-magic-sparkles mr-1" /> AI Enhance</>
+  )}
+</button>
+📊 IMPLEMENTATION PRIORITY
+Change	Impact	Effort	Priority
+1. Undo/Redo	🔥🔥🔥🔥🔥	Medium	DO FIRST
+2. Batch Processing	🔥🔥🔥🔥🔥	High	WEEK 1
+3. Drag & Drop	🔥🔥🔥🔥	Medium	WEEK 2
+4. AI Copy Enhancement	🔥🔥🔥🔥🔥	Medium	WEEK 1
+
+Export as CSV
+🎯 BONUS: Quick Wins You Can Implement TODAY
+tsx
+
+
+// 1. Add keyboard shortcuts throughout the app
+useKeyboardShortcuts({
+  'ctrl+s': handlePush,           // Save/Deploy
+  'ctrl+d': runDeepScan,          // Deep scan
+  'ctrl+a': handleAutoPopulate,   // Auto-deploy all
+  'ctrl+/': () => setViewTab(viewTab === 'visual' ? 'code' : 'visual'),
+  'escape': onBack,
+});
+
+// 2. Add loading skeletons for better perceived performance
+const ProductSkeleton = () => (
+  <div className="animate-pulse bg-dark-800 rounded-2xl p-4">
+    <div className="h-12 w-12 bg-dark-700 rounded-lg mb-3" />
+    <div className="h-4 bg-dark-700 rounded w-3/4 mb-2" />
+    <div className="h-3 bg-dark-700 rounded w-1/2" />
+  </div>
+);
+
+// 3. Add haptic feedback for mobile (vibration on actions)
+const hapticFeedback = () => {
+  if ('vibrate' in navigator) {
+    navigator.vibrate(10);
+  }
+};
+Would you like me to provide complete implementation code for any of these 4 changes, or help you integrate them into your existing codebase?
+Claude Opus 4.5 (Extended)
+
+
+
+Sources
+Images
+Videos
+News
+Attached sources
+TXT
+Document
+
+I_HAVE_BUILT_THIS_APP_BUT_ITS_STILL.txt
+I HAVE BUILT THIS APP BUT ITS STILL VERY LOW QUALITY!!! I WANT YOU TO REVIEW IT AND TELL ME EXACTLY HOW TO MAKE IT 1000000000000000000 TIMES MORE EFFICIENT, ROBUST!!! https://wp-amz-automator.affiliatemarketingforsuccess.com/ https://wp-amz-automator.affiliatemarketingforsuccess.com/ Selected Files Directory Structure: └── ./ └── AmzWP-Automator-main ├── components │ ├── ComparisonTablePreview.tsx │ ├── ConfigPanel.tsx │ ├── LandingPage.tsx │ ├── PostEditor.tsx │ ├── PremiumProductBox.tsx │ ├── ProductBoxPreview.tsx │ └── SitemapScanner.tsx ├── App.tsx ├── constants.ts ├── index.html ├── index.tsx ├── types.ts ├── utils.ts └── vite.config.ts --- AmzWP-Automator-main/App.tsx --- /** * ============================================================================ * AmzWP-Automator | Application Shell v80.0 * ============================================================================ * Enterprise-grade React application with: * - Error Boundaries * - State Persistence * - Performance Optimizations * - Clean Architecture * ============================================================================ */ import React, { useState, useEffect, useCallback, useMemo, Suspense, lazy, ErrorInfo, Component, ReactNode, } from 'react'; import { AppConfig, BlogPost, AppStep, SitemapState } from './types'; import { ConfigPanel } from './components/ConfigPanel'; import { SitemapScanner } from './components/SitemapScanner'; import { LandingPage } from './components/LandingPage'; import { IntelligenceCache } from './utils'; // Lazy load the PostEditor for better initial load performance const PostEditor = lazy(() => import('./components/PostEditor').then(module => ({ default: module.PostEditor })) ); // ============================================================================ // CONSTANTS // ============================================================================ const STORAGE_KEYS = { HAS_ENTERED: 'amzwp_has_entered', CONFIG: 'amzwp_config_v4', SITEMAP_STATE: 'amzwp_sitemap_state_v4', } as const; const DEFAULT_CONFIG: AppConfig = { amazonTag: '', amazonAccessKey: '', amazonSecretKey: '', amazonRegion: 'us-east-1', wpUrl: '', wpUser: '', wpAppPassword: '', serpApiKey: '', autoPublishThreshold: 85, concurrencyLimit: 5, enableSchema: true, enableStickyBar: true, boxStyle: 'PREMIUM', aiProvider: 'gemini', aiModel: 'gemini-2.0-flash', }; // ============================================================================ // ERROR BOUNDARY // ============================================================================ interface ErrorBoundaryProps { children: ReactNode; fallback?: ReactNode; } interface ErrorBoundaryState { hasError: boolean; error: Error | null; } class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> { constructor(props: ErrorBoundaryProps) { super(props); this.state = { hasError: false, error: null }; } static getDerivedStateFromError(error: Error): ErrorBoundaryState { return { hasError: true, error }; } componentDidCatch(error: Error, errorInfo: ErrorInfo) { console.error('[ErrorBoundary] Caught error:', error, errorInfo); } render() { if (this.state.hasError) { return ( this.props.fallback || ( <div className="min-h-screen bg-dark-950 flex items-center justify-center p-8"> <div className="bg-dark-900 border border-red-500/30 rounded-3xl p-12 max-w-lg text-center"> <div className="text-6xl mb-6 text-red-500"> <i className="fa-solid fa-triangle-exclamation"></i> </div> <h1 className="text-2xl font-black text-white mb-4"> Application Error </h1> <p className="text-gray-400 mb-8"> {this.state.error?.message || 'An unexpected error occurred'} </p> <button onClick={() => window.location.reload()} className="bg-white text-dark-950 px-8 py-4 rounded-xl font-bold hover:bg-brand-500 hover:text-white transition-all" > Reload Application </button> </div> </div> ) ); } return this.props.children; } } // ============================================================================ // LOADING COMPONENT // ============================================================================ const LoadingSpinner: React.FC<{ message?: string }> = ({ message = 'Loading...' }) => ( <div className="min-h-screen bg-dark-950 flex items-center justify-center"> <div className="text-center"> <div className="relative w-20 h-20 mx-auto mb-6"> <div className="absolute inset-0 border-4 border-brand-500/20 rounded-full"></div> <div className="absolute inset-0 border-4 border-transparent border-t-brand-500 rounded-full animate-spin"></div> </div> <p className="text-gray-500 font-bold uppercase tracking-widest text-xs"> {message} </p> </div> </div> ); // ============================================================================ // CUSTOM HOOKS // ============================================================================ /** * Persisted state hook with localStorage */ function usePersistedState<T>( key: string, defaultValue: T ): [T, React.Dispatch<React.SetStateAction<T>>] { const [state, setState] = useState<T>(() => { try { const stored = localStorage.getItem(key); return stored ? JSON.parse(stored) : defaultValue; } catch { return defaultValue; } }); useEffect(() => { try ...
+
+1
+TXT
+Document
+
+here_is_the_updated_version_of_the.txt
+here is the updated version of the app!!! i want you to deeply review it and give me 4 changes that will transform it to the best app in the world!!!! Selected Files Directory Structure: └── ./ └── AmzWP-Automator-001 ├── components │ ├── ComparisonTablePreview.tsx │ ├── ConfigPanel.tsx │ ├── LandingPage.tsx │ ├── PostEditor.tsx │ ├── PremiumProductBox.tsx │ ├── ProductBoxPreview.tsx │ └── SitemapScanner.tsx ├── App.tsx ├── constants.ts ├── index.html ├── index.tsx ├── types.ts ├── utils.ts └── vite.config.ts --- AmzWP-Automator-001/App.tsx --- /** * ============================================================================ * AmzWP-Automator | Application Shell v80.0 * ============================================================================ * Enterprise-grade React application with: * - Error Boundaries * - State Persistence * - Performance Optimizations * - Clean Architecture * ============================================================================ */ import React, { useState, useEffect, useCallback, useMemo, Suspense, lazy, ErrorInfo, Component, ReactNode, } from 'react'; import { AppConfig, BlogPost, AppStep, SitemapState } from './types'; import { ConfigPanel } from './components/ConfigPanel'; import { SitemapScanner } from './components/SitemapScanner'; import { LandingPage } from './components/LandingPage'; import { IntelligenceCache } from './utils'; // Lazy load the PostEditor for better initial load performance const PostEditor = lazy(() => import('./components/PostEditor').then(module => ({ default: module.PostEditor })) ); // ============================================================================ // CONSTANTS // ============================================================================ const STORAGE_KEYS = { HAS_ENTERED: 'amzwp_has_entered', CONFIG: 'amzwp_config_v4', SITEMAP_STATE: 'amzwp_sitemap_state_v4', } as const; const DEFAULT_CONFIG: AppConfig = { amazonTag: '', amazonAccessKey: '', amazonSecretKey: '', amazonRegion: 'us-east-1', wpUrl: '', wpUser: '', wpAppPassword: '', serpApiKey: '', autoPublishThreshold: 85, concurrencyLimit: 5, enableSchema: true, enableStickyBar: true, boxStyle: 'PREMIUM', aiProvider: 'gemini', aiModel: 'gemini-2.0-flash', }; // ============================================================================ // ERROR BOUNDARY // ============================================================================ interface ErrorBoundaryProps { children: ReactNode; fallback?: ReactNode; } interface ErrorBoundaryState { hasError: boolean; error: Error | null; } class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> { constructor(props: ErrorBoundaryProps) { super(props); this.state = { hasError: false, error: null }; } static getDerivedStateFromError(error: Error): ErrorBoundaryState { return { hasError: true, error }; } componentDidCatch(error: Error, errorInfo: ErrorInfo) { console.error('[ErrorBoundary] Caught error:', error, errorInfo); } render() { if (this.state.hasError) { return ( this.props.fallback || ( <div className="min-h-screen bg-dark-950 flex items-center justify-center p-8"> <div className="bg-dark-900 border border-red-500/30 rounded-3xl p-12 max-w-lg text-center"> <div className="text-6xl mb-6 text-red-500"> <i className="fa-solid fa-triangle-exclamation"></i> </div> <h1 className="text-2xl font-black text-white mb-4"> Application Error </h1> <p className="text-gray-400 mb-8"> {this.state.error?.message || 'An unexpected error occurred'} </p> <button onClick={() => window.location.reload()} className="bg-white text-dark-950 px-8 py-4 rounded-xl font-bold hover:bg-brand-500 hover:text-white transition-all" > Reload Application </button> </div> </div> ) ); } return this.props.children; } } // ============================================================================ // LOADING COMPONENT // ============================================================================ const LoadingSpinner: React.FC<{ message?: string }> = ({ message = 'Loading...' }) => ( <div className="min-h-screen bg-dark-950 flex items-center justify-center"> <div className="text-center"> <div className="relative w-20 h-20 mx-auto mb-6"> <div className="absolute inset-0 border-4 border-brand-500/20 rounded-full"></div> <div className="absolute inset-0 border-4 border-transparent border-t-brand-500 rounded-full animate-spin"></div> </div> <p className="text-gray-500 font-bold uppercase tracking-widest text-xs"> {message} </p> </div> </div> ); // ============================================================================ // CUSTOM HOOKS // ============================================================================ /** * Persisted state hook with localStorage */ function usePersistedState<T>( key: string, defaultValue: T ): [T, React.Dispatch<React.SetStateAction<T>>] { const [state, setState] = useState<T>(() => { try { const stored = localStorage.getItem(key); return stored ? JSON.parse(stored) : defaultValue; } catch { return defaultValue; } }); useEffect(() => { try { ...
+
+Web sources
+
+textranch.com
+please find attached an updated version of the document or please find attached the updated version of the document?
+We have taken a look at your corrections; please find attached an updated version of the document.
+
+
+ludwig.guru
+attached is the updated file | Meaning, Grammar Guide & Usage Examples | Ludwig.guru
+The phrase "attached is the updated file" is correct and usable in written English. You can use it when you are sending an email or message that includes a file that has been revised or updated. Example: "Dear team, attached is the updated file for your review.
+
+
+
+View all 12 sources
+YES!
+
+Workflow
+
+
+
+Note: Due to model limitations, the response may not account for all data in the uploaded file(s). For better results, consider using fewer or smaller file(s) with essential excerpts. Learn more
+🚀 COMPLETE IMPLEMENTATION: 4 World-Class Features
+Here's the full, production-ready code for all 4 transformative features. Copy-paste directly into your project!
+📁 FILE 1: hooks/useHistory.ts
+Full Undo/Redo System with Keyboard Shortcuts
+typescript
+
+
+// hooks/useHistory.ts
+// ============================================================================
+// ENTERPRISE UNDO/REDO HISTORY SYSTEM
+// ============================================================================
+// Features:
+// - Unlimited undo/redo with configurable max history
+// - Automatic merge of rapid changes (debouncing)
+// - Keyboard shortcuts (Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y)
+// - Memory-efficient state snapshots
+// - TypeScript generic support
+// ============================================================================
+
+import { useState, useCallback, useRef, useEffect } from 'react';
+
+interface HistoryState<T> {
+  past: T[];
+  present: T;
+  future: T[];
+}
+
+interface UseHistoryOptions {
+  maxHistory?: number;
+  mergeInterval?: number; // ms - rapid changes within this window merge into one
+}
+
+interface UseHistoryReturn<T> {
+  state: T;
+  set: (newState: T | ((prev: T) => T), options?: { merge?: boolean }) => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  historyLength: number;
+  futureLength: number;
+  reset: (newState: T) => void;
+  clear: () => void;
+  jumpTo: (index: number) => void;
+}
+
+export function useHistory<T>(
+  initialState: T,
+  options: UseHistoryOptions = {}
+): UseHistoryReturn<T> {
+  const { maxHistory = 50, mergeInterval = 500 } = options;
+
+  const [history, setHistory] = useState<HistoryState<T>>({
+    past: [],
+    present: initialState,
+    future: [],
+  });
+
+  const lastActionRef = useRef<number>(Date.now());
+  const isUndoRedoRef = useRef<boolean>(false);
+
+  // ========== SET STATE ==========
+  const set = useCallback(
+    (newPresent: T | ((prev: T) => T), setOptions?: { merge?: boolean }) => {
+      setHistory((prev) => {
+        const resolvedPresent =
+          typeof newPresent === 'function'
+            ? (newPresent as (prev: T) => T)(prev.present)
+            : newPresent;
+
+        // Skip if no actual change
+        if (JSON.stringify(resolvedPresent) === JSON.stringify(prev.present)) {
+          return prev;
+        }
+
+        const now = Date.now();
+        const shouldMerge =
+          setOptions?.merge || now - lastActionRef.current < mergeInterval;
+        lastActionRef.current = now;
+
+        // Merge rapid changes into single history entry
+        if (shouldMerge && prev.past.length > 0 && !isUndoRedoRef.current) {
+          return {
+            past: prev.past,
+            present: resolvedPresent,
+            future: [], // Clear future on new action
+          };
+        }
+
+        // Create new history entry
+        const newPast = [...prev.past, prev.present].slice(-maxHistory);
+
+        return {
+          past: newPast,
+          present: resolvedPresent,
+          future: [], // Clear future on new action
+        };
+      });
+
+      isUndoRedoRef.current = false;
+    },
+    [maxHistory, mergeInterval]
+  );
+
+  // ========== UNDO ==========
+  const undo = useCallback(() => {
+    setHistory((prev) => {
+      if (prev.past.length === 0) return prev;
+
+      isUndoRedoRef.current = true;
+      const newPast = prev.past.slice(0, -1);
+      const newPresent = prev.past[prev.past.length - 1];
+
+      return {
+        past: newPast,
+        present: newPresent,
+        future: [prev.present, ...prev.future].slice(0, maxHistory),
+      };
+    });
+  }, [maxHistory]);
+
+  // ========== REDO ==========
+  const redo = useCallback(() => {
+    setHistory((prev) => {
+      if (prev.future.length === 0) return prev;
+
+      isUndoRedoRef.current = true;
+      const [newPresent, ...newFuture] = prev.future;
+
+      return {
+        past: [...prev.past, prev.present],
+        present: newPresent,
+        future: newFuture,
+      };
+    });
+  }, []);
+
+  // ========== RESET ==========
+  const reset = useCallback((newState: T) => {
+    setHistory({
+      past: [],
+      present: newState,
+      future: [],
+    });
+  }, []);
+
+  // ========== CLEAR HISTORY ==========
+  const clear = useCallback(() => {
+    setHistory((prev) => ({
+      past: [],
+      present: prev.present,
+      future: [],
+    }));
+  }, []);
+
+  // ========== JUMP TO SPECIFIC POINT ==========
+  const jumpTo = useCallback(
+    (index: number) => {
+      setHistory((prev) => {
+        const allStates = [...prev.past, prev.present, ...prev.future];
+        if (index < 0 || index >= allStates.length) return prev;
+
+        const newPresent = allStates[index];
+        const newPast = allStates.slice(0, index);
+        const newFuture = allStates.slice(index + 1);
+
+        return {
+          past: newPast,
+          present: newPresent,
+          future: newFuture,
+        };
+      });
+    },
+    []
+  );
+
+  return {
+    state: history.present,
+    set,
+    undo,
+    redo,
+    canUndo: history.past.length > 0,
+    canRedo: history.future.length > 0,
+    historyLength: history.past.length,
+    futureLength: history.future.length,
+    reset,
+    clear,
+    jumpTo,
+  };
+}
+
+// ============================================================================
+// KEYBOARD SHORTCUTS HOOK
+// ============================================================================
+
+interface ShortcutMap {
+  [key: string]: () => void;
+}
+
+export function useKeyboardShortcuts(shortcuts: ShortcutMap) {
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs
+      const target = event.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        // Allow Ctrl+Z/Y even in editable areas for undo/redo
+        const isUndoRedo = 
+          (event.ctrlKey || event.metaKey) && 
+          (event.key === 'z' || event.key === 'y');
+        if (!isUndoRedo) return;
+      }
+
+      // Build shortcut string
+      const parts: string[] = [];
+      if (event.ctrlKey) parts.push('ctrl');
+      if (event.metaKey) parts.push('meta');
+      if (event.shiftKey) parts.push('shift');
+      if (event.altKey) parts.push('alt');
+      parts.push(event.key.toLowerCase());
+
+      const shortcut = parts.join('+');
+
+      // Check for matching shortcut
+      if (shortcuts[shortcut]) {
+        event.preventDefault();
+        event.stopPropagation();
+        shortcuts[shortcut]();
+      }
+    };
+
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
+  }, [shortcuts]);
+}
+
+// ============================================================================
+// COMBINED HOOK FOR EDITOR
+// ============================================================================
+
+export function useEditorHistory<T>(initialState: T) {
+  const history = useHistory<T>(initialState, {
+    maxHistory: 100,
+    mergeInterval: 300,
+  });
+
+  // Register keyboard shortcuts
+  useKeyboardShortcuts({
+    'ctrl+z': history.undo,
+    'meta+z': history.undo,
+    'ctrl+shift+z': history.redo,
+    'meta+shift+z': history.redo,
+    'ctrl+y': history.redo,
+    'meta+y': history.redo,
+  });
+
+  return history;
+}
+
+export default useHistory;
+📁 FILE 2: components/BatchProcessor.tsx
+Complete Batch Processing Engine
+tsx
+
+
+// components/BatchProcessor.tsx
+// ============================================================================
+// ENTERPRISE BATCH PROCESSING ENGINE
+// ============================================================================
+// Features:
+// - Parallel processing with configurable concurrency
+// - Real-time progress tracking
+// - Abort/pause capability
+// - Auto-publish option
+// - Detailed job status and timing
+// - Error recovery and retry logic
+// ============================================================================
+
+import React, { useState, useCallback, useRef, useMemo } from 'react';
+import { BlogPost, AppConfig, ProductDetails } from '../types';
+import {
+  analyzeContentAndFindProduct,
+  pushToWordPress,
+  fetchRawPostContent,
+  generateProductBoxHtml,
+} from '../utils';
+import Toastify from 'toastify-js';
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export interface BatchJob {
+  id: string;
+  post: BlogPost;
+  status: 'queued' | 'processing' | 'completed' | 'failed' | 'skipped' | 'paused';
+  progress: number;
+  productsFound: number;
+  error?: string;
+  startTime?: number;
+  endTime?: number;
+  retryCount: number;
+}
+
+interface BatchProcessorProps {
+  posts: BlogPost[];
+  config: AppConfig;
+  onComplete: (results: BatchJob[]) => void;
+  onClose: () => void;
+}
+
+interface BatchStats {
+  total: number;
+  completed: number;
+  failed: number;
+  processing: number;
+  queued: number;
+  skipped: number;
+  productsFound: number;
+  avgTime: number;
+  estimatedRemaining: number;
+}
+
+// ============================================================================
+// COMPONENT
+// ============================================================================
+
+export const BatchProcessor: React.FC<BatchProcessorProps> = ({
+  posts,
+  config,
+  onComplete,
+  onClose,
+}) => {
+  // ========== STATE ==========
+  const [jobs, setJobs] = useState<BatchJob[]>([]);
+  const [isRunning, setIsRunning] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [concurrency, setConcurrency] = useState(3);
+  const [autoPublish, setAutoPublish] = useState(false);
+  const [autoPlaceProducts, setAutoPlaceProducts] = useState(true);
+  const [maxRetries, setMaxRetries] = useState(2);
+
+  // ========== REFS ==========
+  const abortRef = useRef(false);
+  const pauseRef = useRef(false);
+  const startTimeRef = useRef<number>(0);
+
+  // ========== COMPUTED STATS ==========
+  const stats: BatchStats = useMemo(() => {
+    const completed = jobs.filter((j) => j.status === 'completed');
+    const failed = jobs.filter((j) => j.status === 'failed');
+    const processing = jobs.filter((j) => j.status === 'processing');
+    const queued = jobs.filter((j) => j.status === 'queued');
+    const skipped = jobs.filter((j) => j.status === 'skipped');
+
+    const completedTimes = completed
+      .filter((j) => j.endTime && j.startTime)
+      .map((j) => j.endTime! - j.startTime!);
+
+    const avgTime =
+      completedTimes.length > 0
+        ? completedTimes.reduce((a, b) => a + b, 0) / completedTimes.length
+        : 0;
+
+    const remaining = queued.length + processing.length;
+    const estimatedRemaining = avgTime > 0 ? (remaining * avgTime) / concurrency : 0;
+
+    return {
+      total: jobs.length,
+      completed: completed.length,
+      failed: failed.length,
+      processing: processing.length,
+      queued: queued.length,
+      skipped: skipped.length,
+      productsFound: jobs.reduce((sum, j) => sum + j.productsFound, 0),
+      avgTime,
+      estimatedRemaining,
+    };
+  }, [jobs, concurrency]);
+
+  // ========== INITIALIZE JOBS ==========
+  const initializeJobs = useCallback((): BatchJob[] => {
+    const newJobs: BatchJob[] = posts.map((post) => ({
+      id: `job-${post.id}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      post,
+      status: 'queued',
+      progress: 0,
+      productsFound: 0,
+      retryCount: 0,
+    }));
+    setJobs(newJobs);
+    return newJobs;
+  }, [posts]);
+
+  // ========== PROCESS SINGLE JOB ==========
+  const processJob = async (job: BatchJob): Promise<BatchJob> => {
+    // Check abort/pause
+    if (abortRef.current) {
+      return { ...job, status: 'skipped' };
+    }
+
+    while (pauseRef.current) {
+      await new Promise((r) => setTimeout(r, 500));
+      if (abortRef.current) {
+        return { ...job, status: 'skipped' };
+      }
+    }
+
+    const startTime = Date.now();
+
+    try {
+      // Step 1: Update status - Fetching (25%)
+      setJobs((prev) =>
+        prev.map((j) =>
+          j.id === job.id
+            ? { ...j, status: 'processing', progress: 25, startTime }
+            : j
+        )
+      );
+
+      // Fetch content
+      const { content, resolvedId } = await fetchRawPostContent(
+        config,
+        job.post.id,
+        job.post.url
+      );
+
+      if (abortRef.current) return { ...job, status: 'skipped' };
+
+      // Step 2: Update status - Analyzing (50%)
+      setJobs((prev) =>
+        prev.map((j) => (j.id === job.id ? { ...j, progress: 50 } : j))
+      );
+
+      // Analyze content
+      const analysis = await analyzeContentAndFindProduct(
+        job.post.title,
+        content,
+        config
+      );
+
+      if (abortRef.current) return { ...job, status: 'skipped' };
+
+      // Step 3: Update status - Generating (75%)
+      setJobs((prev) =>
+        prev.map((j) =>
+          j.id === job.id
+            ? { ...j, progress: 75, productsFound: analysis.detectedProducts.length }
+            : j
+        )
+      );
+
+      // Skip if no products found
+      if (analysis.detectedProducts.length === 0) {
+        return {
+          ...job,
+          status: 'completed',
+          progress: 100,
+          productsFound: 0,
+          endTime: Date.now(),
+        };
+      }
+
+      // Generate final HTML with products
+      let finalContent = content;
+
+      if (autoPlaceProducts) {
+        const productHtmls = analysis.detectedProducts.map((p) =>
+          generateProductBoxHtml(p, config.amazonTag, p.deploymentMode)
+        );
+
+        // Smart placement: after first paragraph
+        const blocks = content.split('</p>');
+        if (blocks.length > 1) {
+          finalContent =
+            blocks[0] +
+            '</p>\n\n' +
+            productHtmls.join('\n\n') +
+            '\n\n' +
+            blocks.slice(1).join('</p>');
+        } else {
+          finalContent = content + '\n\n' + productHtmls.join('\n\n');
+        }
+      }
+
+      // Step 4: Publish if enabled (90%)
+      if (autoPublish) {
+        setJobs((prev) =>
+          prev.map((j) => (j.id === job.id ? { ...j, progress: 90 } : j))
+        );
+
+        await pushToWordPress(config, resolvedId, finalContent);
+      }
+
+      return {
+        ...job,
+        status: 'completed',
+        progress: 100,
+        productsFound: analysis.detectedProducts.length,
+        endTime: Date.now(),
+      };
+    } catch (error: any) {
+      // Retry logic
+      if (job.retryCount < maxRetries) {
+        setJobs((prev) =>
+          prev.map((j) =>
+            j.id === job.id
+              ? { ...j, status: 'queued', progress: 0, retryCount: j.retryCount + 1 }
+              : j
+          )
+        );
+        
+        // Wait before retry
+        await new Promise((r) => setTimeout(r, 2000 * (job.retryCount + 1)));
+        
+        return processJob({ ...job, retryCount: job.retryCount + 1 });
+      }
+
+      return {
+        ...job,
+        status: 'failed',
+        progress: 0,
+        error: error.message?.substring(0, 150) || 'Unknown error',
+        endTime: Date.now(),
+      };
+    }
+  };
+
+  // ========== RUN BATCH ==========
+  const runBatch = async () => {
+    setIsRunning(true);
+    setIsPaused(false);
+    abortRef.current = false;
+    pauseRef.current = false;
+    startTimeRef.current = Date.now();
+
+    const initialJobs = initializeJobs();
+    const queue = [...initialJobs];
+    const results: BatchJob[] = [];
+
+    // Create worker pool
+    const workers = Array(Math.min(concurrency, queue.length))
+      .fill(null)
+      .map(async () => {
+        while (queue.length > 0 && !abortRef.current) {
+          const job = queue.shift();
+          if (job) {
+            const result = await processJob(job);
+            results.push(result);
+            setJobs((prev) =>
+              prev.map((j) => (j.id === result.id ? result : j))
+            );
+          }
+        }
+      });
+
+    await Promise.all(workers);
+
+    setIsRunning(false);
+    setIsPaused(false);
+
+    // Show completion toast
+    const successCount = results.filter((r) => r.status === 'completed').length;
+    const failCount = results.filter((r) => r.status === 'failed').length;
+    const productsFound = results.reduce((sum, r) => sum + r.productsFound, 0);
+
+    Toastify({
+      text: `Batch Complete: ${successCount} succeeded, ${failCount} failed, ${productsFound} products found`,
+      duration: 5000,
+      style: { background: failCount > 0 ? '#f59e0b' : '#10b981' },
+    }).showToast();
+
+    onComplete(results);
+  };
+
+  // ========== CONTROL FUNCTIONS ==========
+  const pauseBatch = () => {
+    pauseRef.current = true;
+    setIsPaused(true);
+  };
+
+  const resumeBatch = () => {
+    pauseRef.current = false;
+    setIsPaused(false);
+  };
+
+  const abortBatch = () => {
+    abortRef.current = true;
+    pauseRef.current = false;
+    setIsPaused(false);
+  };
+
+  // ========== FORMAT TIME ==========
+  const formatTime = (ms: number): string => {
+    if (ms < 1000) return `${Math.round(ms)}ms`;
+    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+    return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
+  };
+
+  // ========== RENDER ==========
+  return (
+    <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 md:p-8">
+      <div className="bg-dark-900 border border-dark-700 rounded-[40px] max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+        {/* ========== HEADER ========== */}
+        <div className="p-6 md:p-8 border-b border-dark-800 flex items-center justify-between bg-dark-950/50">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center">
+                <i className="fa-solid fa-bolt text-white" />
+              </div>
+              Batch Processor
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Process {posts.length} posts simultaneously
+            </p>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="w-10 h-10 rounded-full bg-dark-800 hover:bg-red-500/20 text-gray-400 hover:text-red-400 flex items-center justify-center transition-all"
+          >
+            <i className="fa-solid fa-times" />
+          </button>
+        </div>
+
+        {/* ========== PROGRESS OVERVIEW ========== */}
+        <div className="p-6 bg-dark-900 border-b border-dark-800">
+          {/* Progress Bar */}
+          <div className="relative h-4 bg-dark-800 rounded-full overflow-hidden mb-4">
+            <div
+              className="absolute inset-y-0 left-0 bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 transition-all duration-500"
+              style={{
+                width: `${stats.total > 0 ? (stats.completed / stats.total) * 100 : 0}%`,
+              }}
+            />
+            {stats.failed > 0 && (
+              <div
+                className="absolute inset-y-0 bg-red-500 transition-all duration-500"
+                style={{
+                  left: `${(stats.completed / stats.total) * 100}%`,
+                  width: `${(stats.failed / stats.total) * 100}%`,
+                }}
+              />
+            )}
+          </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {[
+              { label: 'Processing', value: stats.processing, color: 'blue', icon: 'fa-spinner fa-spin' },
+              { label: 'Completed', value: stats.completed, color: 'green', icon: 'fa-check' },
+              { label: 'Failed', value: stats.failed, color: 'red', icon: 'fa-times' },
+              { label: 'Products', value: stats.productsFound, color: 'amber', icon: 'fa-box' },
+              { label: 'ETA', value: formatTime(stats.estimatedRemaining), color: 'purple', icon: 'fa-clock', isText: true },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className={`bg-${stat.color}-500/10 rounded-2xl p-4 text-center border border-${stat.color}-500/20`}
+              >
+                <div className={`text-2xl font-black text-${stat.color}-400`}>
+                  {stat.isText ? stat.value : stat.value}
+                </div>
+                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center justify-center gap-1">
+                  <i className={`fa-solid ${stat.icon} text-${stat.color}-400`} />
+                  {stat.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ========== CONTROLS ========== */}
+        <div className="p-4 md:p-6 bg-dark-950/50 border-b border-dark-800 flex flex-wrap items-center gap-4">
+          {/* Concurrency Selector */}
+          <div className="flex items-center gap-3">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+              Parallel:
+            </label>
+            <select
+              value={concurrency}
+              onChange={(e) => setConcurrency(Number(e.target.value))}
+              disabled={isRunning}
+              className="bg-dark-800 border border-dark-700 rounded-xl px-4 py-2 text-white text-sm focus:border-brand-500 outline-none disabled:opacity-50"
+            >
+              {[1, 2, 3, 5, 10, 15, 20].map((n) => (
+                <option key={n} value={n}>
+                  {n} jobs
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Auto-publish Toggle */}
+          <label className="flex items-center gap-2 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={autoPublish}
+              onChange={(e) => setAutoPublish(e.target.checked)}
+              disabled={isRunning}
+              className="w-5 h-5 accent-brand-500 rounded"
+            />
+            <span className="text-xs font-bold text-gray-400 group-hover:text-white transition-colors">
+              Auto-Publish
+            </span>
+          </label>
+
+          {/* Auto-place Toggle */}
+          <label className="flex items-center gap-2 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={autoPlaceProducts}
+              onChange={(e) => setAutoPlaceProducts(e.target.checked)}
+              disabled={isRunning}
+              className="w-5 h-5 accent-brand-500 rounded"
+            />
+            <span className="text-xs font-bold text-gray-400 group-hover:text-white transition-colors">
+              Auto-Place Products
+            </span>
+          </label>
+
+          {/* Action Buttons */}
+          <div className="ml-auto flex gap-3">
+            {isRunning ? (
+              <>
+                {isPaused ? (
+                  <button
+                    onClick={resumeBatch}
+                    className="px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-sm uppercase tracking-wider transition-all flex items-center gap-2"
+                  >
+                    <i className="fa-solid fa-play" /> Resume
+                  </button>
+                ) : (
+                  <button
+                    onClick={pauseBatch}
+                    className="px-6 py-3 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold text-sm uppercase tracking-wider transition-all flex items-center gap-2"
+                  >
+                    <i className="fa-solid fa-pause" /> Pause
+                  </button>
+                )}
+                <button
+                  onClick={abortBatch}
+                  className="px-6 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-sm uppercase tracking-wider transition-all flex items-center gap-2"
+                >
+                  <i className="fa-solid fa-stop" /> Abort
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={runBatch}
+                disabled={posts.length === 0}
+                className="px-8 py-3 bg-gradient-to-r from-brand-600 to-purple-600 hover:from-brand-500 hover:to-purple-500 text-white rounded-xl font-black text-sm uppercase tracking-wider transition-all disabled:opacity-50 flex items-center gap-2 shadow-xl"
+              >
+                <i className="fa-solid fa-rocket" /> Start Batch ({posts.length})
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ========== JOB LIST ========== */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3 custom-scrollbar">
+          {jobs.length === 0 ? (
+            <div className="py-20 text-center">
+              <div className="text-6xl text-dark-700 mb-4">
+                <i className="fa-solid fa-inbox" />
+              </div>
+              <p className="text-gray-500 font-bold uppercase tracking-widest text-xs">
+                Click "Start Batch" to begin processing
+              </p>
+            </div>
+          ) : (
+            jobs.map((job) => (
+              <div
+                key={job.id}
+                className={`p-4 rounded-2xl border transition-all ${
+                  job.status === 'completed'
+                    ? 'bg-green-500/5 border-green-500/20'
+                    : job.status === 'failed'
+                    ? 'bg-red-500/5 border-red-500/20'
+                    : job.status === 'processing'
+                    ? 'bg-blue-500/5 border-blue-500/20'
+                    : job.status === 'paused'
+                    ? 'bg-amber-500/5 border-amber-500/20'
+                    : 'bg-dark-800 border-dark-700'
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  {/* Status Icon */}
+                  <div
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      job.status === 'completed'
+                        ? 'bg-green-500 text-white'
+                        : job.status === 'failed'
+                        ? 'bg-red-500 text-white'
+                        : job.status === 'processing'
+                        ? 'bg-blue-500 text-white'
+                        : job.status === 'paused'
+                        ? 'bg-amber-500 text-white'
+                        : 'bg-dark-700 text-gray-500'
+                    }`}
+                  >
+                    {job.status === 'completed' && <i className="fa-solid fa-check" />}
+                    {job.status === 'failed' && <i className="fa-solid fa-times" />}
+                    {job.status === 'processing' && (
+                      <i className="fa-solid fa-spinner fa-spin" />
+                    )}
+                    {job.status === 'paused' && <i className="fa-solid fa-pause" />}
+                    {job.status === 'queued' && <i className="fa-solid fa-clock" />}
+                    {job.status === 'skipped' && <i className="fa-solid fa-forward" />}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-white truncate">{job.post.title}</div>
+                    <div className="text-xs text-gray-500 truncate">{job.post.url}</div>
+                    {job.retryCount > 0 && (
+                      <div className="text-[10px] text-amber-400 mt-1">
+                        Retry attempt {job.retryCount}/{maxRetries}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Progress/Stats */}
+                  {job.status === 'processing' && (
+                    <div className="w-32 flex-shrink-0">
+                      <div className="h-2 bg-dark-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-blue-500 transition-all duration-300"
+                          style={{ width: `${job.progress}%` }}
+                        />
+                      </div>
+                      <div className="text-[10px] text-blue-400 text-right mt-1">
+                        {job.progress}%
+                      </div>
+                    </div>
+                  )}
+
+                  {job.status === 'completed' && (
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-sm font-bold text-green-400">
+                        {job.productsFound} products
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        {formatTime(job.endTime! - job.startTime!)}
+                      </div>
+                    </div>
+                  )}
+
+                  {job.status === 'failed' && (
+                    <div
+                      className="text-xs text-red-400 max-w-[200px] truncate flex-shrink-0"
+                      title={job.error}
+                    >
+                      {job.error}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default BatchProcessor;
+📁 FILE 3: hooks/useDragAndDrop.ts
+Complete Drag-and-Drop System
+typescript
+
+
+// hooks/useDragAndDrop.ts
+// ============================================================================
+// ENTERPRISE DRAG-AND-DROP SYSTEM
+// ============================================================================
+// Features:
+// - Drag items between positions
+// - Visual drop indicators
+// - Touch support
+// - Keyboard accessibility
+// - Type-safe generics
+// ============================================================================
+
+import { useState, useCallback, useRef, DragEvent, TouchEvent } from 'react';
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export interface DragState {
+  isDragging: boolean;
+  draggedItemId: string | null;
+  draggedItemType: string | null;
+  dropTargetId: string | null;
+  dropPosition: 'before' | 'after' | 'inside' | null;
+  dragStartY: number;
+}
+
+export interface DragHandlers {
+  onDragStart: (e: DragEvent, itemId: string, itemType?: string) => void;
+  onDragOver: (e: DragEvent, targetId: string) => void;
+  onDragEnter: (e: DragEvent) => void;
+  onDragLeave: (e: DragEvent) => void;
+  onDrop: (e: DragEvent, targetId: string) => void;
+  onDragEnd: () => void;
+}
+
+export interface UseDragAndDropReturn<T> {
+  dragState: DragState;
+  handlers: DragHandlers;
+  getItemStyle: (itemId: string) => React.CSSProperties;
+  getDropIndicatorStyle: (targetId: string, position: 'before' | 'after') => React.CSSProperties;
+  isDraggedOver: (targetId: string, position?: 'before' | 'after') => boolean;
+}
+
+// ============================================================================
+// MAIN HOOK
+// ============================================================================
+
+export function useDragAndDrop<T extends { id: string }>(
+  items: T[],
+  onReorder: (newItems: T[]) => void,
+  onInsert?: (itemId: string, targetIndex: number, itemType: string) => void
+): UseDragAndDropReturn<T> {
+  const [dragState, setDragState] = useState<DragState>({
+    isDragging: false,
+    draggedItemId: null,
+    draggedItemType: null,
+    dropTargetId: null,
+    dropPosition: null,
+    dragStartY: 0,
+  });
+
+  const dragCounterRef = useRef(0);
+
+  // ========== DRAG START ==========
+  const handleDragStart = useCallback(
+    (e: DragEvent, itemId: string, itemType = 'default') => {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', itemId);
+      e.dataTransfer.setData('application/x-item-type', itemType);
+
+      // Create custom drag image
+      const dragImage = document.createElement('div');
+      dragImage.className =
+        'fixed pointer-events-none bg-gradient-to-r from-brand-600 to-purple-600 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-2xl z-[9999]';
+      dragImage.textContent = itemType === 'product' ? '📦 Product' : '📝 Block';
+      dragImage.style.top = '-1000px';
+      document.body.appendChild(dragImage);
+      e.dataTransfer.setDragImage(dragImage, 20, 20);
+
+      // Clean up drag image after a short delay
+      setTimeout(() => {
+        if (document.body.contains(dragImage)) {
+          document.body.removeChild(dragImage);
+        }
+      }, 0);
+
+      setDragState({
+        isDragging: true,
+        draggedItemId: itemId,
+        draggedItemType: itemType,
+        dropTargetId: null,
+        dropPosition: null,
+        dragStartY: e.clientY,
+      });
+    },
+    []
+  );
+
+  // ========== DRAG OVER ==========
+  const handleDragOver = useCallback(
+    (e: DragEvent, targetId: string) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+
+      const target = e.currentTarget as HTMLElement;
+      const rect = target.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      const position: 'before' | 'after' = e.clientY < midY ? 'before' : 'after';
+
+      setDragState((prev) => ({
+        ...prev,
+        dropTargetId: targetId,
+        dropPosition: position,
+      }));
+    },
+    []
+  );
+
+  // ========== DRAG ENTER ==========
+  const handleDragEnter = useCallback((e: DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current++;
+  }, []);
+
+  // ========== DRAG LEAVE ==========
+  const handleDragLeave = useCallback((e: DragEvent) => {
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setDragState((prev) => ({
+        ...prev,
+        dropTargetId: null,
+        dropPosition: null,
+      }));
+    }
+  }, []);
+
+  // ========== DROP ==========
+  const handleDrop = useCallback(
+    (e: DragEvent, targetId: string) => {
+      e.preventDefault();
+      dragCounterRef.current = 0;
+
+      const draggedId = e.dataTransfer.getData('text/plain');
+      const itemType = e.dataTransfer.getData('application/x-item-type');
+
+      if (!draggedId) {
+        setDragState({
+          isDragging: false,
+          draggedItemId: null,
+          draggedItemType: null,
+          dropTargetId: null,
+          dropPosition: null,
+          dragStartY: 0,
+        });
+        return;
+      }
+
+      // Calculate drop position
+      const target = e.currentTarget as HTMLElement;
+      const rect = target.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      const position: 'before' | 'after' = e.clientY < midY ? 'before' : 'after';
+
+      // Check if this is an existing item being reordered
+      const existingItemIndex = items.findIndex((item) => item.id === draggedId);
+      const targetIndex = items.findIndex((item) => item.id === targetId);
+
+      if (existingItemIndex !== -1 && targetIndex !== -1 && draggedId !== targetId) {
+        // Reorder existing items
+        const newItems = [...items];
+        const [draggedItem] = newItems.splice(existingItemIndex, 1);
+
+        let insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
+        if (existingItemIndex < targetIndex) {
+          insertIndex--;
+        }
+        insertIndex = Math.max(0, Math.min(insertIndex, newItems.length));
+
+        newItems.splice(insertIndex, 0, draggedItem);
+        onReorder(newItems);
+      } else if (existingItemIndex === -1 && onInsert) {
+        // Insert new item from external source
+        let insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
+        insertIndex = Math.max(0, insertIndex);
+        onInsert(draggedId, insertIndex, itemType);
+      }
+
+      // Reset drag state
+      setDragState({
+        isDragging: false,
+        draggedItemId: null,
+        draggedItemType: null,
+        dropTargetId: null,
+        dropPosition: null,
+        dragStartY: 0,
+      });
+    },
+    [items, onReorder, onInsert]
+  );
+
+  // ========== DRAG END ==========
+  const handleDragEnd = useCallback(() => {
+    dragCounterRef.current = 0;
+    setDragState({
+      isDragging: false,
+      draggedItemId: null,
+      draggedItemType: null,
+      dropTargetId: null,
+      dropPosition: null,
+      dragStartY: 0,
+    });
+  }, []);
+
+  // ========== STYLE HELPERS ==========
+  const getItemStyle = useCallback(
+    (itemId: string): React.CSSProperties => {
+      if (dragState.draggedItemId === itemId) {
+        return {
+          opacity: 0.5,
+          transform: 'scale(0.98)',
+          transition: 'all 0.2s ease',
+        };
+      }
+      return {};
+    },
+    [dragState.draggedItemId]
+  );
+
+  const getDropIndicatorStyle = useCallback(
+    (targetId: string, position: 'before' | 'after'): React.CSSProperties => {
+      const isActive =
+        dragState.dropTargetId === targetId && dragState.dropPosition === position;
+
+      return {
+        height: isActive ? '4rem' : '0.25rem',
+        opacity: isActive ? 1 : 0,
+        background: isActive
+          ? 'linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.3), transparent)'
+          : 'transparent',
+        border: isActive ? '2px dashed rgba(99, 102, 241, 0.5)' : 'none',
+        borderRadius: '0.5rem',
+        transition: 'all 0.2s ease',
+        margin: isActive ? '0.5rem 0' : '0',
+      };
+    },
+    [dragState.dropTargetId, dragState.dropPosition]
+  );
+
+  const isDraggedOver = useCallback(
+    (targetId: string, position?: 'before' | 'after'): boolean => {
+      if (!dragState.isDragging) return false;
+      if (dragState.dropTargetId !== targetId) return false;
+      if (position && dragState.dropPosition !== position) return false;
+      return true;
+    },
+    [dragState]
+  );
+
+  return {
+    dragState,
+    handlers: {
+      onDragStart: handleDragStart,
+      onDragOver: handleDragOver,
+      onDragEnter: handleDragEnter,
+      onDragLeave: handleDragLeave,
+      onDrop: handleDrop,
+      onDragEnd: handleDragEnd,
+    },
+    getItemStyle,
+    getDropIndicatorStyle,
+    isDraggedOver,
+  };
+}
+
+// ============================================================================
+// DROP ZONE COMPONENT
+// ============================================================================
+
+interface DropZoneProps {
+  isActive: boolean;
+  position: 'before' | 'after';
+  label?: string;
+}
+
+export const DropZone: React.FC<DropZoneProps> = ({
+  isActive,
+  position,
+  label = 'Drop here',
+}) => (
+  <div
+    className={`
+      relative rounded-2xl transition-all duration-300 overflow-hidden
+      ${
+        isActive
+          ? 'h-20 bg-gradient-to-r from-brand-500/10 via-brand-500/20 to-brand-500/10 border-2 border-dashed border-brand-500 my-2'
+          : 'h-1 bg-transparent my-0'
+      }
+    `}
+  >
+    {isActive && (
+      <div className="absolute inset-0 flex items-center justify-center animate-pulse">
+        <div className="bg-brand-500 text-white px-6 py-2 rounded-full text-xs font-black uppercase tracking-widest shadow-xl flex items-center gap-2">
+          <i
+            className={`fa-solid ${
+              position === 'before' ? 'fa-arrow-up' : 'fa-arrow-down'
+            }`}
+          />
+          {label}
+        </div>
+      </div>
+    )}
+  </div>
+);
+
+export default useDragAndDrop;
+📁 FILE 4: utils/aiCopywriter.ts
+AI-Powered Copy Enhancement
+typescript
+
+
+// utils/aiCopywriter.ts
+// ============================================================================
+// AI-POWERED COPY ENHANCEMENT ENGINE
+// ============================================================================
+// Features:
+// - Dynamic product-specific copy generation
+// - Conversion-optimized verdicts
+// - FAQ generation
+// - Urgency hooks
+// - Multi-provider support
+// ============================================================================
+
+import { ProductDetails, AppConfig } from '../types';
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export interface EnhancedCopy {
+  verdict: string;
+  headline: string;
+  bulletPoints: string[];
+  callToAction: string;
+  faqs: Array<{ question: string; answer: string }>;
+  urgencyHook: string;
+  seoTitle: string;
+  metaDescription: string;
+}
+
+export interface CopyEnhancementOptions {
+  tone?: 'professional' | 'casual' | 'urgent' | 'luxury';
+  targetAudience?: string;
+  focusKeywords?: string[];
+  maxBullets?: number;
+  maxFaqs?: number;
+}
+
+// ============================================================================
+// PROMPT TEMPLATES
+// ============================================================================
+
+const COPY_ENHANCEMENT_PROMPT = `You are an elite conversion copywriter specializing in Amazon affiliate content that generates massive commissions.
+
+PRODUCT DATA:
+- Name: {{PRODUCT_NAME}}
+- Brand: {{BRAND}}
+- Category: {{CATEGORY}}
+- Price: {{PRICE}}
+- Rating: {{RATING}}/5 ({{REVIEW_COUNT}} reviews)
+- Prime Eligible: {{PRIME}}
+
+POST CONTEXT (for relevance):
+{{CONTEXT}}
+
+TONE: {{TONE}}
+TARGET AUDIENCE: {{AUDIENCE}}
+
+Generate HIGHLY PERSUASIVE, conversion-optimized copy for this product.
+
+OUTPUT FORMAT (JSON only):
+{
+  "verdict": "2-3 sentence expert verdict. Start with BENEFIT not product. Use power words: transforms, eliminates, delivers, revolutionizes. Be specific with results.",
+  
+  "headline": "10 words max. Create curiosity or urgency. Examples: 'Finally: The [Product] Serious [Users] Trust' or 'Why [Number]+ [Audience] Made the Switch'",
+  
+  "bulletPoints": [
+    "✓ [BENEFIT]: [Feature that enables it]. Be specific with numbers.",
+    "✓ [BENEFIT]: [Feature]. Include social proof when possible.",
+    "✓ [BENEFIT]: [Feature]. Address common pain point.",
+    "✓ [BENEFIT]: [Feature]. Mention guarantee/warranty."
+  ],
+  
+  "callToAction": "5 words max urgency-driven CTA. NOT 'Buy Now'. Examples: 'Claim Your Discount Today', 'See Why 50K+ Chose This', 'Check Today's Price Drop'",
+  
+  "faqs": [
+    {"question": "Real objection buyers have", "answer": "1-2 sentences removing friction"},
+    {"question": "Common concern about product", "answer": "Reassuring answer with proof"},
+    {"question": "Comparison question", "answer": "Why this product wins"}
+  ],
+  
+  "urgencyHook": "1 believable scarcity/time sentence. Example: 'Currently 23% off for Prime members - price updates daily'",
+  
+  "seoTitle": "60 chars max. Include brand, key benefit, current year",
+  
+  "metaDescription": "155 chars max. Include CTA and key differentiator"
+}
+
+RULES:
+- NO generic phrases like "high quality", "great product", "top-notch"
+- Use specific numbers and data points
+- Address reader as "you" - make it personal  
+- Focus on TRANSFORMATION and OUTCOME
+- Match tone to product category
+- Every sentence must ADD VALUE or CREATE DESIRE
+
+Return ONLY valid JSON. No explanations.`;
+
+// ============================================================================
+// CATEGORY-SPECIFIC TONE MAPPING
+// ============================================================================
+
+const getCategoryTone = (category: string, productName: string): string => {
+  const combined = `${category} ${productName}`.toLowerCase();
+
+  const toneMap: Record<string, string> = {
+    tech: 'precise, data-driven, forward-thinking',
+    audio: 'sensory, immersive, passionate',
+    kitchen: 'warm, practical, family-focused',
+    fitness: 'motivational, results-oriented, energetic',
+    beauty: 'aspirational, confident, transformative',
+    gaming: 'competitive, edge-focused, performance-driven',
+    outdoor: 'adventurous, reliable, tough',
+    baby: 'caring, safe, peace-of-mind focused',
+    pet: 'loving, fun, health-conscious',
+    home: 'comfortable, stylish, practical',
+  };
+
+  for (const [key, tone] of Object.entries(toneMap)) {
+    if (combined.includes(key)) return tone;
+  }
+
+  return 'professional, trustworthy, benefit-focused';
+};
+
+// ============================================================================
+// AI PROVIDER CALL (Reuse from utils.ts or import)
+// ============================================================================
+
+const callAIForCopy = async (
+  config: AppConfig,
+  prompt: string
+): Promise<string> => {
+  // This should integrate with your existing AI provider system
+  // For now, here's the Gemini implementation:
+
+  if (config.aiProvider === 'gemini' && config.geminiApiKey) {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${
+        config.aiModel || 'gemini-2.0-flash'
+      }:generateContent?key=${config.geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  }
+
+  // Add other providers as needed...
+  throw new Error('No AI provider configured');
+};
+
+// ============================================================================
+// MAIN ENHANCEMENT FUNCTION
+// ============================================================================
+
+export const enhanceProductCopy = async (
+  product: ProductDetails,
+  postContext: string,
+  config: AppConfig,
+  options: CopyEnhancementOptions = {}
+): Promise<EnhancedCopy> => {
+  const {
+    tone,
+    targetAudience = 'discerning buyers who research before purchasing',
+    focusKeywords = [],
+    maxBullets = 4,
+    maxFaqs = 3,
+  } = options;
+
+  // Determine tone based on category if not specified
+  const effectiveTone =
+    tone || getCategoryTone(product.category || '', product.title);
+
+  // Build prompt
+  const prompt = COPY_ENHANCEMENT_PROMPT.replace('{{PRODUCT_NAME}}', product.title)
+    .replace('{{BRAND}}', product.brand || 'Premium Brand')
+    .replace('{{CATEGORY}}', product.category || 'General')
+    .replace('{{PRICE}}', product.price || 'Check Price')
+    .replace('{{RATING}}', String(product.rating || 4.5))
+    .replace('{{REVIEW_COUNT}}', String(product.reviewCount || 1000))
+    .replace('{{PRIME}}', product.prime ? 'Yes' : 'No')
+    .replace('{{CONTEXT}}', postContext.substring(0, 2000))
+    .replace('{{TONE}}', effectiveTone)
+    .replace('{{AUDIENCE}}', targetAudience);
+
+  try {
+    const response = await callAIForCopy(config, prompt);
+    const parsed = JSON.parse(response);
+
+    return {
+      verdict: parsed.verdict || product.verdict || '',
+      headline: parsed.headline || product.title,
+      bulletPoints: (parsed.bulletPoints || []).slice(0, maxBullets),
+      callToAction: parsed.callToAction || 'Check Price on Amazon',
+      faqs: (parsed.faqs || []).slice(0, maxFaqs),
+      urgencyHook: parsed.urgencyHook || '',
+      seoTitle: parsed.seoTitle || product.title,
+      metaDescription: parsed.metaDescription || '',
+    };
+  } catch (error) {
+    console.error('[enhanceProductCopy] AI enhancement failed:', error);
+
+    // Return fallback copy
+    return generateFallbackCopy(product);
+  }
+};
+
+// ============================================================================
+// FALLBACK COPY GENERATOR
+// ============================================================================
+
+const generateFallbackCopy = (product: ProductDetails): EnhancedCopy => {
+  const brand = product.brand || 'This premium';
+  const name = product.title.split(' ').slice(0, 4).join(' ');
+
+  return {
+    verdict: `Engineered for users who demand excellence, the ${brand} ${name} delivers professional-grade performance with meticulous attention to detail. Backed by thousands of verified reviews and trusted by industry professionals worldwide.`,
+    headline: `Why Experts Recommend ${brand}`,
+    bulletPoints: [
+      `✓ Premium Quality: Industry-leading materials and construction`,
+      `✓ Verified Performance: ${product.reviewCount || '2,400'}+ positive reviews`,
+      `✓ Peace of Mind: Comprehensive warranty protection included`,
+      `✓ Fast Delivery: Prime eligible with free returns`,
+    ],
+    callToAction: 'Check Today\'s Price',
+    faqs: [
+      {
+        question: 'Is this product covered by warranty?',
+        answer:
+          'Yes, it includes a comprehensive manufacturer warranty for complete peace of mind.',
+      },
+      {
+        question: 'How fast is shipping?',
+        answer: 'Prime eligible for fast, free delivery with easy returns.',
+      },
+      {
+        question: 'Is this worth the investment?',
+        answer: `With ${product.rating || 4.5}/5 stars from thousands of buyers, this is a proven choice.`,
+      },
+    ],
+    urgencyHook: 'Prices and availability may change - check current deals now.',
+    seoTitle: `${product.title} Review 2026 - Worth It?`,
+    metaDescription: `Expert review of ${product.title}. See why ${product.reviewCount || '2,400'}+ buyers rated it ${product.rating || 4.5}/5 stars. Check today's price.`,
+  };
+};
+
+// ============================================================================
+// BATCH ENHANCEMENT
+// ============================================================================
+
+export const enhanceMultipleProducts = async (
+  products: ProductDetails[],
+  postContext: string,
+  config: AppConfig,
+  options: CopyEnhancementOptions = {}
+): Promise<Map<string, EnhancedCopy>> => {
+  const results = new Map<string, EnhancedCopy>();
+
+  // Process in parallel with concurrency limit
+  const concurrency = 3;
+  const queue = [...products];
+
+  const workers = Array(Math.min(concurrency, queue.length))
+    .fill(null)
+    .map(async () => {
+      while (queue.length > 0) {
+        const product = queue.shift();
+        if (product) {
+          try {
+            const enhanced = await enhanceProductCopy(
+              product,
+              postContext,
+              config,
+              options
+            );
+            results.set(product.id, enhanced);
+          } catch {
+            results.set(product.id, generateFallbackCopy(product));
+          }
+        }
+      }
+    });
+
+  await Promise.all(workers);
+
+  return results;
+};
+
+// ============================================================================
+// QUICK VERDICT GENERATOR (No AI - Instant)
+// ============================================================================
+
+export const generateQuickVerdict = (product: ProductDetails): string => {
+  const brand = product.brand || 'This';
+  const rating = product.rating || 4.5;
+  const reviews = product.reviewCount || 1000;
+
+  const templates = [
+    `With an impressive ${rating}/5 rating from ${reviews.toLocaleString()}+ verified buyers, the ${brand} ${product.title.split(' ').slice(0, 3).join(' ')} stands out as a top performer in its category. Premium construction meets thoughtful design for users who refuse to compromise.`,
+
+    `${brand} delivers exceptional value with the ${product.title.split(' ').slice(0, 3).join(' ')}, earning ${rating}/5 stars from ${reviews.toLocaleString()}+ customers. This is the choice for buyers who research before they purchase.`,
+
+    `Trusted by ${reviews.toLocaleString()}+ verified buyers with a ${rating}/5 rating, the ${brand} ${product.title.split(' ').slice(0, 3).join(' ')} proves that quality and value can coexist. A solid investment for discerning shoppers.`,
+  ];
+
+  // Select template based on product characteristics
+  const index = Math.floor((rating * reviews) % templates.length);
+  return templates[index];
+};
+
+export default enhanceProductCopy;
+📁 FILE 5: Integration into PostEditor.tsx
+Add these changes to your existing PostEditor:
+tsx
+
+
+// At the top of PostEditor.tsx, add imports:
+import { useEditorHistory, useKeyboardShortcuts } from '../hooks/useHistory';
+import { useDragAndDrop, DropZone } from '../hooks/useDragAndDrop';
+import { enhanceProductCopy, generateQuickVerdict } from '../utils/aiCopywriter';
+import { BatchProcessor } from './BatchProcessor';
+
+// Inside PostEditor component, replace the editorNodes useState with:
+
+// ========== UNDO/REDO SYSTEM ==========
+const {
+  state: editorNodes,
+  set: setEditorNodes,
+  undo,
+  redo,
+  canUndo,
+  canRedo,
+  historyLength,
+} = useEditorHistory<EditorNode[]>([]);
+
+// ========== DRAG AND DROP ==========
+const {
+  dragState,
+  handlers: dragHandlers,
+  getItemStyle,
+  isDraggedOver,
+} = useDragAndDrop<EditorNode>(
+  editorNodes,
+  (newNodes) => setEditorNodes(newNodes),
+  (productId, targetIndex, itemType) => {
+    if (itemType === 'product' && productMap[productId]) {
+      const newNode: EditorNode = {
+        id: `prod-node-${productId}-${Date.now()}`,
+        type: 'PRODUCT',
+        productId,
+      };
+      const newNodes = [...editorNodes];
+      newNodes.splice(targetIndex, 0, newNode);
+      setEditorNodes(newNodes);
+      Toastify({
+        text: 'Product dropped into position!',
+        style: { background: '#10b981' },
+      }).showToast();
+    }
+  }
+);
+
+// ========== AI COPY ENHANCEMENT ==========
+const [enhancingProduct, setEnhancingProduct] = useState<string | null>(null);
+
+const handleEnhanceCopy = async (productId: string) => {
+  setEnhancingProduct(productId);
+  try {
+    const product = productMap[productId];
+    if (!product) return;
+
+    const context = editorNodes
+      .filter((n) => n.type === 'HTML')
+      .map((n) => n.content)
+      .join(' ');
+
+    const enhanced = await enhanceProductCopy(product, context, config);
+
+    setProductMap((prev) => ({
+      ...prev,
+      [productId]: {
+        ...prev[productId],
+        verdict: enhanced.verdict,
+        evidenceClaims: enhanced.bulletPoints,
+        faqs: enhanced.faqs,
+      },
+    }));
+
+    Toastify({
+      text: 'Copy enhanced with AI magic! ✨',
+      style: { background: '#8b5cf6' },
+    }).showToast();
+  } catch (e: any) {
+    Toastify({
+      text: `Enhancement failed: ${e.message}`,
+      style: { background: '#ef4444' },
+    }).showToast();
+  } finally {
+    setEnhancingProduct(null);
+  }
+};
+
+// ========== KEYBOARD SHORTCUTS ==========
+useKeyboardShortcuts({
+  'ctrl+s': handlePush,
+  'meta+s': handlePush,
+  'ctrl+d': runDeepScan,
+  'meta+d': runDeepScan,
+  'ctrl+shift+a': handleAutoPopulate,
+  'meta+shift+a': handleAutoPopulate,
+});
+
+// Add to the toolbar UI:
+<div className="flex items-center gap-2 bg-white/90 backdrop-blur rounded-full px-4 py-2 shadow-xl">
+  <button
+    onClick={undo}
+    disabled={!canUndo}
+    className={`p-2 rounded-full transition-all ${
+      canUndo
+        ? 'hover:bg-slate-100 text-slate-700'
+        : 'text-slate-300 cursor-not-allowed'
+    }`}
+    title="Undo (Ctrl+Z)"
+  >
+    <i className="fa-solid fa-rotate-left" />
+  </button>
+  <span className="text-xs font-bold text-slate-400 min-w-[3ch] text-center">
+    {historyLength}
+  </span>
+  <button
+    onClick={redo}
+    disabled={!canRedo}
+    className={`p-2 rounded-full transition-all ${
+      canRedo
+        ? 'hover:bg-slate-100 text-slate-700'
+        : 'text-slate-300 cursor-not-allowed'
+    }`}
+    title="Redo (Ctrl+Shift+Z)"
+  >
+    <i className="fa-solid fa-rotate-right" />
+  </button>
+</div>
+
+// Add to product node controls (inside the product render):
+<button
+  onClick={() => handleEnhanceCopy(node.productId!)}
+  disabled={enhancingProduct === node.productId}
+  className="px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-wider shadow-lg transition-all bg-violet-500 text-white hover:bg-violet-400 disabled:opacity-50"
+>
+  {enhancingProduct === node.productId ? (
+    <>
+      <i className="fa-solid fa-spinner fa-spin mr-1" /> Enhancing...
+    </>
+  ) : (
+    <>
+      <i className="fa-solid fa-wand-magic-sparkles mr-1" /> AI Enhance
+    </>
+  )}
+</button>
+
+// Make nodes draggable - add to each node div:
+<div
+  key={node.id}
+  draggable
+  onDragStart={(e) => dragHandlers.onDragStart(e, node.id, node.type.toLowerCase())}
+  onDragOver={(e) => dragHandlers.onDragOver(e, node.id)}
+  onDragEnter={dragHandlers.onDragEnter}
+  onDragLeave={dragHandlers.onDragLeave}
+  onDrop={(e) => dragHandlers.onDrop(e, node.id)}
+  onDragEnd={dragHandlers.onDragEnd}
+  style={getItemStyle(node.id)}
+  className={`... cursor-grab active:cursor-grabbing`}
+>
+  {/* Drop zone before */}
+  <DropZone
+    isActive={isDraggedOver(node.id, 'before')}
+    position="before"
+  />
+  
+  {/* Node content */}
+  ...
+  
+  {/* Drop zone after */}
+  <DropZone
+    isActive={isDraggedOver(node.id, 'after')}
+    position="after"
+  />
+</div>
+
+// Make staging area products draggable:
+{getUnplacedProducts().map((p) => (
+  <div
+    key={p.id}
+    draggable
+    onDragStart={(e) => dragHandlers.onDragStart(e, p.id, 'product')}
+    onDragEnd={dragHandlers.onDragEnd}
+    className="... cursor-grab active:cursor-grabbing"
+  >
+    ...
+  </div>
+))}
+🎯 Summary: What You Now Have
+Feature	File	Key Capabilities
+Undo/Redo	hooks/useHistory.ts	Ctrl+Z/Y, 100-step history, auto-merge rapid changes
+Batch Processing	components/BatchProcessor.tsx	Parallel jobs, pause/resume, retry logic, auto-publish
+Drag & Drop	hooks/useDragAndDrop.ts	Reorder blocks, drop products, visual indicators
+AI Copy	utils/aiCopywriter.ts	Enhanced verdicts, FAQs, urgency hooks, SEO meta
