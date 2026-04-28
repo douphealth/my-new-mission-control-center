@@ -2990,7 +2990,8 @@ const extractReviewCount = (result: any): number => {
  */
 export const searchAmazonProduct = async (
   query: string,
-  apiKey: string
+  apiKey: string,
+  tracker?: BudgetTracker,
 ): Promise<Partial<ProductDetails>> => {
   const cleanKey = getApiKey(apiKey);
 
@@ -3011,6 +3012,7 @@ export const searchAmazonProduct = async (
     type: 'search',
     query,
     apiKey: cleanKey,
+    tracker,
   });
 
   const allResults = [
@@ -3113,7 +3115,8 @@ const extractProductImage = (result: any): string => {
  */
 export const fetchProductByASIN = async (
   asin: string,
-  apiKey: string
+  apiKey: string,
+  tracker?: BudgetTracker,
 ): Promise<ProductDetails | null> => {
   const cleanKey = getApiKey(apiKey);
 
@@ -3137,6 +3140,7 @@ export const fetchProductByASIN = async (
       type: 'product',
       asin,
       apiKey: cleanKey,
+      tracker,
     });
 
     const result = data.product_results || data.product_result;
