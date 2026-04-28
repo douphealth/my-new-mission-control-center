@@ -1891,22 +1891,27 @@ export const analyzeContentAndFindProduct = async (
   const contentLower = cleanContent.toLowerCase();
 
   const phase1Products = extractProductsPhase1(truncatedContent, cleanContent);
+  const lookupBudget = estimateLookupBudget(truncatedContent, phase1Products.length);
 
   // Check for SerpAPI key
   if (!config.serpApiKey || config.serpApiKey.trim().length === 0) {
     throw new Error('SerpAPI key is required for product detection. Add it in Settings > Amazon.');
   }
 
-  // AGGRESSIVE: If we have Phase 1 products and SerpAPI, use them directly
+  // Fast path: use the strongest phase-1 signals first, but stay within a strict lookup budget.
   if (phase1Products.length > 0 && config.serpApiKey) {
     const quickProducts: ProductDetails[] = [];
-    const maxPhase1 = Math.min(phase1Products.length, 12);
+    const prioritizedPhase1 = [...phase1Products]
+      .sort((a, b) => (b.confidence - a.confidence) || Number(Boolean(b.asin)) - Number(Boolean(a.asin)))
+      .slice(0, Math.min(phase1Products.length, Math.max(lookupBudget * 2, MAX_PHASE1_LOOKUPS)));
+    const maxPhase1 = prioritizedPhase1.length;
     let lastSerpError: string | null = null;
     let serpErrorCount = 0;
     let hasFatalSerpError = false;
 
     for (let i = 0; i < maxPhase1; i++) {
-      const p1 = phase1Products[i];
+      const p1 = prioritizedPhase1[i];
+      if (quickProducts.length >= lookupBudget) break;
 
       try {
         let productData: Partial<ProductDetails> = {};
@@ -1925,6 +1930,9 @@ export const analyzeContentAndFindProduct = async (
         }
 
         if (!productData.asin) {
+          if (!shouldUseSearchQuery(p1.name)) {
+            continue;
+          }
           try {
             productData = await searchAmazonProduct(p1.name, config.serpApiKey);
           } catch (e: any) {
@@ -1988,9 +1996,10 @@ export const analyzeContentAndFindProduct = async (
     }
 
     if (quickProducts.length > 0) {
+      const refinedQuickProducts = finalizeDetectedProducts(quickProducts, lookupBudget);
       let comparison: ComparisonData | undefined;
-      if (quickProducts.length >= 3) {
-        const productIds = quickProducts.slice(0, 10).map(p => p.id);
+      if (refinedQuickProducts.length >= 3) {
+        const productIds = refinedQuickProducts.slice(0, 10).map(p => p.id);
         comparison = {
           title: `${title} - Product Comparison`,
           productIds,
@@ -1998,12 +2007,12 @@ export const analyzeContentAndFindProduct = async (
         };
       }
 
-      IntelligenceCache.setAnalysis(contentHash, { products: quickProducts, comparison });
+      IntelligenceCache.setAnalysis(contentHash, { products: refinedQuickProducts, comparison });
       return {
-        detectedProducts: quickProducts,
+        detectedProducts: refinedQuickProducts,
         comparison,
         contentType: 'informational',
-        monetizationPotential: quickProducts.length >= 3 ? 'high' : 'medium',
+        monetizationPotential: refinedQuickProducts.length >= 3 ? 'high' : 'medium',
       };
     }
   }
@@ -2084,13 +2093,19 @@ export const analyzeContentAndFindProduct = async (
       }
     }
 
+    const prioritizedQueue = serpApiQueue
+      .filter(({ product }) => shouldUseSearchQuery(product.searchQuery || product.title || ''))
+      .sort((a, b) => (b.product.confidence || 0) - (a.product.confidence || 0))
+      .slice(0, Math.min(lookupBudget, MAX_AI_QUEUE_LOOKUPS));
+
     let serpBatchError: string | null = null;
     let serpBatchFatal = false;
 
     const batchSize = 3;
-    for (let i = 0; i < serpApiQueue.length; i += batchSize) {
+    for (let i = 0; i < prioritizedQueue.length; i += batchSize) {
       if (serpBatchFatal) break;
-      const batch = serpApiQueue.slice(i, i + batchSize);
+      if (products.length >= lookupBudget) break;
+      const batch = prioritizedQueue.slice(i, i + batchSize);
 
       const batchPromises = batch.map(async ({ key, product, asin }) => {
         let productData: Partial<ProductDetails> = {};
@@ -2161,29 +2176,31 @@ export const analyzeContentAndFindProduct = async (
         });
       }
 
-      if (i + batchSize < serpApiQueue.length) {
+      if (i + batchSize < prioritizedQueue.length) {
         await sleep(200);
       }
     }
 
-    if (products.length === 0 && serpBatchFatal && serpBatchError) {
+    const refinedProducts = finalizeDetectedProducts(products, lookupBudget);
+
+    if (refinedProducts.length === 0 && serpBatchFatal && serpBatchError) {
       throw new Error(`SerpAPI Error: ${serpBatchError}`);
     }
 
-    if (products.length === 0 && serpBatchError && validatedProducts.size > 0) {
+    if (refinedProducts.length === 0 && serpBatchError && validatedProducts.size > 0) {
       throw new Error(`Found ${validatedProducts.size} products in content but SerpAPI failed: ${serpBatchError}`);
     }
 
     let comparison: ComparisonData | undefined;
-    if (parsed.comparison?.shouldCreate && products.length >= 2) {
-      const productIds = products.slice(0, 5).map(p => p.id);
+    if (parsed.comparison?.shouldCreate && refinedProducts.length >= 2) {
+      const productIds = refinedProducts.slice(0, 5).map(p => p.id);
       comparison = {
         title: parsed.comparison.title || `Top ${title} Comparison`,
         productIds,
         specs: ['Price', 'Rating', 'Reviews'],
       };
-    } else if (products.length >= 3) {
-      const productIds = products.slice(0, 5).map(p => p.id);
+    } else if (refinedProducts.length >= 3) {
+      const productIds = refinedProducts.slice(0, 5).map(p => p.id);
       comparison = {
         title: `${title} - Product Comparison`,
         productIds,
@@ -2191,13 +2208,13 @@ export const analyzeContentAndFindProduct = async (
       };
     }
 
-    IntelligenceCache.setAnalysis(contentHash, { products, comparison });
+    IntelligenceCache.setAnalysis(contentHash, { products: refinedProducts, comparison });
 
     return {
-      detectedProducts: products,
+      detectedProducts: refinedProducts,
       comparison,
       contentType: parsed.contentType || 'informational',
-      monetizationPotential: products.length >= 3 ? 'high' : products.length > 0 ? 'medium' : 'low',
+      monetizationPotential: refinedProducts.length >= 3 ? 'high' : refinedProducts.length > 0 ? 'medium' : 'low',
       keywords: parsed.suggestedKeywords || [],
     };
 
@@ -2210,7 +2227,8 @@ export const analyzeContentAndFindProduct = async (
       const fallbackProducts: ProductDetails[] = [];
       let fallbackSerpError: string | null = null;
 
-      for (const p1 of phase1Products.slice(0, 8)) {
+      for (const p1 of phase1Products.slice(0, Math.min(Math.max(lookupBudget, 2), MAX_PHASE1_LOOKUPS))) {
+        if (fallbackProducts.length >= lookupBudget) break;
         try {
           let productData: Partial<ProductDetails> = {};
           if (p1.asin) {
@@ -2222,6 +2240,9 @@ export const analyzeContentAndFindProduct = async (
             }
           }
           if (!productData.asin) {
+            if (!shouldUseSearchQuery(p1.name)) {
+              continue;
+            }
             try {
               productData = await searchAmazonProduct(p1.name, config.serpApiKey);
             } catch (e: any) {
@@ -2260,10 +2281,11 @@ export const analyzeContentAndFindProduct = async (
       }
 
       if (fallbackProducts.length > 0) {
+        const refinedFallbackProducts = finalizeDetectedProducts(fallbackProducts, lookupBudget);
         return {
-          detectedProducts: fallbackProducts,
+          detectedProducts: refinedFallbackProducts,
           contentType: 'informational',
-          monetizationPotential: 'medium',
+          monetizationPotential: refinedFallbackProducts.length >= 3 ? 'high' : 'medium',
         };
       }
 
