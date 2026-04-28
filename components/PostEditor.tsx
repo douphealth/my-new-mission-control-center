@@ -230,6 +230,7 @@ const ProductCountBadge: React.FC<{ placed: number; total: number }> = ({ placed
 // ============================================================================
 
 export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) => {
+  const normalizedConfig = useMemo(() => sanitizeAppConfig(config), [config]);
   // ========================================================================
   // STATE
   // ========================================================================
@@ -296,7 +297,7 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
       setStatus('fetching');
 
       try {
-        const result = await fetchRawPostContent(config, post.id, post.url || '');
+        const result = await fetchRawPostContent(normalizedConfig, post.id, post.url || '');
         if (!mounted) return;
 
         if (!result.content || result.content.length < 10) {
@@ -622,7 +623,7 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
       const precisionResult = await tryPrecisionDetect(
         post.title,
         currentHtml,
-        config,
+        normalizedConfig,
         (stage, current, total) => setScanProgress({ stage, current, total }),
       );
 
@@ -637,10 +638,42 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
       } else {
         // 2. Fallback to legacy scan
         setScanProgress({ stage: 'Falling back to legacy scan…', current: 3, total: 6 });
-        const legacy = await analyzeContentAndFindProduct(post.title, currentHtml, config);
+        const legacy = await analyzeContentAndFindProduct(post.title, currentHtml, normalizedConfig, {
+          onProgress: (event) => {
+            setScanProgress((prev) => ({
+              stage: event.stage,
+              current: prev?.current ?? 4,
+              total: prev?.total ?? 6,
+              message: event.message,
+              serpApiCallsUsed: event.serpApiCallsUsed,
+              serpApiCallBudget: event.serpApiCallBudget,
+              candidatesEvaluated: event.candidatesEvaluated,
+              productsKept: event.productsKept,
+              skipped: event.skipped,
+              skippedItems: event.skippedItems,
+            }));
+          },
+        });
         products = legacy.detectedProducts;
         comparison = legacy.comparison;
         candidateCount = products.length;
+        setScanReport(
+          legacy.scanReport
+            ? {
+                serpApiCallsUsed: legacy.scanReport.serpApiCallsUsed,
+                serpApiCallBudget: legacy.scanReport.serpApiCallBudget,
+                budgetExhausted: legacy.scanReport.budgetExhausted,
+                serpApiRetries: legacy.scanReport.serpApiRetries,
+                productsKept: legacy.scanReport.productsKept,
+                candidatesEvaluated: legacy.scanReport.candidatesEvaluated,
+                skipped: legacy.scanReport.skipped.map((item) => ({
+                  name: item.name,
+                  reason: item.reason,
+                  detail: item.detail,
+                })),
+              }
+            : null,
+        );
       }
 
       // 3. Merge results into product map
@@ -685,7 +718,7 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
       setStatus('idle');
       setScanProgress(null);
     }
-  }, [config, editorNodes, post.title, productMap, setEditorNodes]);
+  }, [editorNodes, normalizedConfig, post.title, productMap, setEditorNodes]);
 
   // ========================================================================
   // NODE MANIPULATION
@@ -836,7 +869,7 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
     setStatus('pushing');
     try {
       const html = generateFinalHtml();
-      const link = await pushToWordPress(config, currentId, html);
+      const link = await pushToWordPress(normalizedConfig, currentId, html);
       toast('Production Sync Successful');
       window.open(link, '_blank');
     } catch (e: any) {
@@ -844,7 +877,7 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
     } finally {
       setStatus('idle');
     }
-  }, [generateFinalHtml, config, currentId]);
+  }, [generateFinalHtml, normalizedConfig, currentId]);
 
   // ========================================================================
   // RENDER
