@@ -2483,10 +2483,56 @@ function optimizeSearchQuery(query: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 
-  const stopWords = ['the', 'a', 'an', 'new', 'best', 'top', 'review', 'our', 'my', 'your', 'this', 'that'];
-  const words = optimized.split(' ').filter(w => !stopWords.includes(w.toLowerCase()));
+  const stopWords = ['the', 'a', 'an', 'new', 'best', 'top', 'review', 'our', 'my', 'your', 'this', 'that', 'quick', 'answer', 'key', 'takeaways', 'guide', 'vs'];
+  const words = optimized
+    .split(' ')
+    .map((w) => w.trim())
+    .filter((w) => w.length > 2 && !stopWords.includes(w.toLowerCase()));
 
-  return words.slice(0, 6).join(' ');
+  return words.slice(0, SEARCH_QUERY_MAX_WORDS).join(' ');
+}
+
+function estimateLookupBudget(content: string, phase1Count: number): number {
+  const wordCount = stripHtml(content).split(/\s+/).filter(Boolean).length;
+  const fromLength = Math.max(MIN_PRODUCTS_PER_ARTICLE, Math.ceil(wordCount / MIN_WORDS_PER_PRODUCT));
+  const fromSignals = phase1Count >= 6 ? 3 : phase1Count >= 3 ? 2 : 1;
+  return Math.max(MIN_PRODUCTS_PER_ARTICLE, Math.min(MAX_PRODUCTS_PER_ARTICLE, Math.min(fromLength, fromSignals)));
+}
+
+function shouldUseSearchQuery(query: string): boolean {
+  const optimized = optimizeSearchQuery(query);
+  const words = optimized.split(/\s+/).filter(Boolean);
+  return words.length >= SEARCH_QUERY_MIN_WORDS;
+}
+
+function scoreProductCandidate(product: Partial<ProductDetails>, confidence = 0): number {
+  let score = confidence;
+  if (product.asin) score += 45;
+  if (product.imageUrl) score += 25;
+  if (product.price && product.price !== '$XX.XX' && product.price !== 'See Price') score += 20;
+  if ((product.reviewCount || 0) > 50) score += 10;
+  if ((product.rating || 0) >= 4) score += 8;
+  return score;
+}
+
+function finalizeDetectedProducts(products: ProductDetails[], desiredCount: number): ProductDetails[] {
+  const unique = new Map<string, ProductDetails>();
+
+  for (const product of products) {
+    if (!product?.asin) continue;
+    const existing = unique.get(product.asin);
+    if (!existing || scoreProductCandidate(product, product.confidence) > scoreProductCandidate(existing, existing.confidence)) {
+      unique.set(product.asin, product);
+    }
+  }
+
+  return Array.from(unique.values())
+    .sort((a, b) => scoreProductCandidate(b, b.confidence) - scoreProductCandidate(a, a.confidence))
+    .slice(0, desiredCount)
+    .map((product, index) => ({
+      ...product,
+      insertionIndex: typeof product.paragraphIndex === 'number' ? product.paragraphIndex : index,
+    }));
 }
 
 
