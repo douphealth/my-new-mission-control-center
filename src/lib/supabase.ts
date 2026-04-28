@@ -15,6 +15,21 @@ const DEFAULT_SUPABASE_URL = 'https://dszpokkqhrtjutmvcxnh.supabase.co';
 const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_DR3JoohreA2S4Z3akVmICQ_ZZp2DSnW';
 const CLOUD_BASELINE_KEY = 'mc-cloud-baseline-ready';
 const LAST_SYNC_FALLBACK_KEY = 'mc-last-sync-at';
+const REQUIRED_REMOTE_TABLES = [
+    'mc_websites',
+    'mc_tasks',
+    'mc_repos',
+    'mc_build_projects',
+    'mc_links',
+    'mc_notes',
+    'mc_payments',
+    'mc_ideas',
+    'mc_credentials',
+    'mc_custom_modules',
+    'mc_habits',
+    'mc_settings',
+    'mc_sync_log',
+] as const;
 
 export interface SyncSchemaError {
     table: string;
@@ -32,15 +47,33 @@ export interface SyncDiagnostics {
     lastSyncAt: string | null;
     queuedChanges: number;
     availableTables: Record<string, boolean>;
+    schemaReady: boolean;
+    missingTables: string[];
     schemaErrors: SyncSchemaError[];
+}
+
+export interface SupabaseConnectionHealth {
+    ok: boolean;
+    connectionOk: boolean;
+    schemaReady: boolean;
+    missingTables: string[];
+    error?: string;
 }
 
 export function getDefaultSupabaseUrl(): string {
     return DEFAULT_SUPABASE_URL;
 }
 
-export function getSupabaseProjectHost(): string {
-    return new URL(DEFAULT_SUPABASE_URL).host;
+export function getSupabaseProjectHost(url?: string): string {
+    try {
+        return new URL(url || getSupabaseConfig()?.url || DEFAULT_SUPABASE_URL).host;
+    } catch {
+        return new URL(DEFAULT_SUPABASE_URL).host;
+    }
+}
+
+function buildSchemaBlockedMessage(missingTables: string[]): string {
+    return `Connected to Supabase, but sync is blocked: ${missingTables.length}/${REQUIRED_REMOTE_TABLES.length} required tables are missing. Run the SQL schema setup below first.`;
 }
 
 function hasCloudBaseline(): boolean {
@@ -74,7 +107,7 @@ function chunkArray<T>(items: T[], size: number): T[][] {
 async function getAvailableRemoteTables(client: SupabaseClient): Promise<Record<string, boolean>> {
     if (schemaAvailability) return schemaAvailability;
     const checks = await Promise.all(
-        [...TABLE_MAP.map(t => t.remote), 'mc_settings', 'mc_sync_log'].map(async (table) => {
+        REQUIRED_REMOTE_TABLES.map(async (table) => {
             const { error } = await client.from(table).select('id').limit(1);
             if (error && (error.code === '42P01' || error.code === 'PGRST205')) {
                 schemaErrors.push({
