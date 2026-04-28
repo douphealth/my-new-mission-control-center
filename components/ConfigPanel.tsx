@@ -16,7 +16,7 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { AppConfig, AIProvider, BoxStyle, AmazonRegion } from '../types';
-import { testConnection, SecureStorage } from '../utils';
+import { testConnection, SecureStorage, sanitizeAppConfig } from '../utils';
 import { toast } from 'sonner';
 
 // ============================================================================
@@ -165,7 +165,7 @@ const decryptConfig = (config: AppConfig): AppConfig => {
   for (const field of SENSITIVE_FIELDS) {
     result[field as string] = safeDecrypt(config[field as keyof AppConfig] as string);
   }
-  return result as AppConfig;
+  return sanitizeAppConfig(result as AppConfig);
 };
 
 /**
@@ -211,6 +211,22 @@ const validateConfig = (config: AppConfig, tab: ConfigTab): ValidationResult => 
   if (tab === 'amazon') {
     if (!config.amazonTag?.trim()) {
       errors.amazonTag = 'Associate Tag is required';
+    }
+    if (
+      typeof config.serpApiCallBudget !== 'number' ||
+      Number.isNaN(config.serpApiCallBudget) ||
+      config.serpApiCallBudget < 1 ||
+      config.serpApiCallBudget > 50
+    ) {
+      errors.serpApiCallBudget = 'Budget must be between 1 and 50 calls per scan';
+    }
+    if (
+      typeof config.serpApiMinCandidateScore !== 'number' ||
+      Number.isNaN(config.serpApiMinCandidateScore) ||
+      config.serpApiMinCandidateScore < 0 ||
+      config.serpApiMinCandidateScore > 100
+    ) {
+      errors.serpApiMinCandidateScore = 'Minimum score must be between 0 and 100';
     }
   }
 
