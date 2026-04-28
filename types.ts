@@ -1085,6 +1085,8 @@ export const DEFAULT_CONFIG: AppConfig = {
   enableSchema: true,
   enableStickyBar: true,
   boxStyle: 'PREMIUM',
+  serpApiCallBudget: 8,
+  serpApiMinCandidateScore: 35,
 };
 
 /**

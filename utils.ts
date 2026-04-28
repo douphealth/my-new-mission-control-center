@@ -306,6 +306,15 @@ const stripHtml = (html: string): string => {
     .trim();
 };
 
+const getWordPressSiteBaseUrl = (input: string): string => {
+  const trimmed = input.trim().replace(/\/$/, '');
+  return trimmed.replace(/\/wp-json(?:\/wp\/v2|\/v2)?$/i, '');
+};
+
+const getWordPressApiBaseUrl = (input: string): string => {
+  return `${getWordPressSiteBaseUrl(input)}/wp-json/wp/v2`;
+};
+
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
 
@@ -360,6 +369,7 @@ export interface ScanProgressEvent {
   candidatesEvaluated: number;
   productsKept: number;
   skipped: number;
+  skippedItems: SkippedCandidate[];
 }
 
 export type ScanProgressHandler = (event: ScanProgressEvent) => void;
@@ -460,6 +470,7 @@ class BudgetTracker {
         candidatesEvaluated: this.candidatesEvaluated,
         productsKept: this.productsKept,
         skipped: this.skipped.length,
+        skippedItems: this.skipped.slice(-12),
       });
     } catch {
       // Progress handler errors must never break the scan.
@@ -498,6 +509,21 @@ function resolveMinCandidateScore(config: AppConfig): number {
     return DEFAULT_SERPAPI_MIN_CANDIDATE_SCORE;
   }
   return Math.max(0, Math.min(100, value));
+}
+
+export function sanitizeAppConfig(config: AppConfig): AppConfig {
+  return {
+    ...config,
+    wpUrl: config.wpUrl ? getWordPressSiteBaseUrl(config.wpUrl) : '',
+    serpApiCallBudget: Math.max(
+      1,
+      Math.min(50, Math.floor(config.serpApiCallBudget ?? DEFAULT_SERPAPI_CALL_BUDGET)),
+    ),
+    serpApiMinCandidateScore: Math.max(
+      0,
+      Math.min(100, Math.floor(config.serpApiMinCandidateScore ?? DEFAULT_SERPAPI_MIN_CANDIDATE_SCORE)),
+    ),
+  };
 }
 
 const upgradeAmazonImageToHighRes = (imageUrl: string): string => {
@@ -910,7 +936,7 @@ const fetchAllPostsViaWordPressAPI = async (config: AppConfig): Promise<BlogPost
     throw new Error('WordPress credentials not configured');
   }
 
-  const apiBase = config.wpUrl.replace(/\/$/, '') + '/wp-json/wp/v2';
+  const apiBase = getWordPressApiBaseUrl(config.wpUrl);
   const auth = btoa(`${config.wpUser}:${config.wpAppPassword}`);
   const allPosts: BlogPost[] = [];
   let page = 1;
@@ -1277,7 +1303,7 @@ const fetchViaWordPressAPI = async (
 
     if (!slug) return null;
 
-    const apiBase = config.wpUrl.replace(/\/$/, '') + '/wp-json/wp/v2';
+    const apiBase = getWordPressApiBaseUrl(config.wpUrl);
     const auth = btoa(`${config.wpUser}:${config.wpAppPassword}`);
 
     // Try posts first
@@ -1326,7 +1352,7 @@ export const fetchRawPostContent = async (
   // Try WordPress API with ID first
   if (config.wpUrl && config.wpUser && config.wpAppPassword) {
     try {
-      const apiBase = config.wpUrl.replace(/\/$/, '') + '/wp-json/wp/v2';
+      const apiBase = getWordPressApiBaseUrl(config.wpUrl);
       const auth = btoa(`${config.wpUser}:${config.wpAppPassword}`);
 
       let response = await fetchWithTimeout(
@@ -1448,7 +1474,7 @@ export const pushToWordPress = async (
     throw new Error('WordPress credentials not configured. Please configure in Settings.');
   }
 
-  const apiUrl = `${config.wpUrl.replace(/\/$/, '')}/wp-json/wp/v2/posts/${postId}`;
+  const apiUrl = `${getWordPressApiBaseUrl(config.wpUrl)}/posts/${postId}`;
   const auth = btoa(`${config.wpUser}:${config.wpAppPassword}`);
 
   const response = await fetchWithTimeout(
@@ -1499,8 +1525,8 @@ export const testConnection = async (
   }
 
   try {
-    const baseUrl = config.wpUrl.replace(/\/$/, '');
-    const apiUrl = `${baseUrl}/wp-json/wp/v2/users/me`;
+    const baseUrl = getWordPressSiteBaseUrl(config.wpUrl);
+    const apiUrl = `${getWordPressApiBaseUrl(config.wpUrl)}/users/me`;
 
     const auth = btoa(`${config.wpUser}:${config.wpAppPassword}`);
 
@@ -2474,6 +2500,7 @@ export const analyzeContentAndFindProduct = async (
       contentType: parsed.contentType || 'informational',
       monetizationPotential: refinedProducts.length >= 3 ? 'high' : refinedProducts.length > 0 ? 'medium' : 'low',
       keywords: parsed.suggestedKeywords || [],
+      scanReport: tracker.finalize(),
     };
 
   } catch (error: any) {
@@ -2544,6 +2571,7 @@ export const analyzeContentAndFindProduct = async (
           detectedProducts: refinedFallbackProducts,
           contentType: 'informational',
           monetizationPotential: refinedFallbackProducts.length >= 3 ? 'high' : 'medium',
+          scanReport: tracker.finalize(),
         };
       }
 
@@ -4182,7 +4210,7 @@ export const fetchPostsFromWordPressAPI = async (
   let totalPages = 1;
   let totalPosts = 0;
 
-  const apiBase = config.wpUrl.replace(/\/$/, '') + '/wp-json/wp/v2';
+  const apiBase = getWordPressApiBaseUrl(config.wpUrl);
 
   const headers: Record<string, string> = {};
   if (config.wpUser && config.wpAppPassword) {

@@ -16,7 +16,7 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { AppConfig, AIProvider, BoxStyle, AmazonRegion } from '../types';
-import { testConnection, SecureStorage } from '../utils';
+import { testConnection, SecureStorage, sanitizeAppConfig } from '../utils';
 import { toast } from 'sonner';
 
 // ============================================================================
@@ -165,7 +165,7 @@ const decryptConfig = (config: AppConfig): AppConfig => {
   for (const field of SENSITIVE_FIELDS) {
     result[field as string] = safeDecrypt(config[field as keyof AppConfig] as string);
   }
-  return result as AppConfig;
+  return sanitizeAppConfig(result as AppConfig);
 };
 
 /**
@@ -211,6 +211,22 @@ const validateConfig = (config: AppConfig, tab: ConfigTab): ValidationResult => 
   if (tab === 'amazon') {
     if (!config.amazonTag?.trim()) {
       errors.amazonTag = 'Associate Tag is required';
+    }
+    if (
+      typeof config.serpApiCallBudget !== 'number' ||
+      Number.isNaN(config.serpApiCallBudget) ||
+      config.serpApiCallBudget < 1 ||
+      config.serpApiCallBudget > 50
+    ) {
+      errors.serpApiCallBudget = 'Budget must be between 1 and 50 calls per scan';
+    }
+    if (
+      typeof config.serpApiMinCandidateScore !== 'number' ||
+      Number.isNaN(config.serpApiMinCandidateScore) ||
+      config.serpApiMinCandidateScore < 0 ||
+      config.serpApiMinCandidateScore > 100
+    ) {
+      errors.serpApiMinCandidateScore = 'Minimum score must be between 0 and 100';
     }
   }
 
@@ -466,7 +482,8 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ onSave, initialConfig 
   }, []);
 
   const handleTestConnection = useCallback(async () => {
-    const validation = validateConfig(config, 'wp');
+    const normalizedConfig = sanitizeAppConfig(config);
+    const validation = validateConfig(normalizedConfig, 'wp');
 
     if (!validation.isValid) {
       setValidationErrors(validation.errors);
@@ -478,7 +495,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ onSave, initialConfig 
     setValidationErrors({});
 
     try {
-      const result = await testConnection(config);
+      const result = await testConnection(normalizedConfig);
 
       if (result.success) {
         setTestConnectionStatus('success');
@@ -495,9 +512,10 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ onSave, initialConfig 
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedConfig = sanitizeAppConfig(config);
     
     // Validate current tab
-    const validation = validateConfig(config, activeTab);
+    const validation = validateConfig(normalizedConfig, activeTab);
     if (!validation.isValid) {
       setValidationErrors(validation.errors);
             toast.error('Please fix validation errors');
@@ -508,7 +526,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ onSave, initialConfig 
 
     try {
       // Encrypt sensitive fields using async AES-GCM before saving
-      const encryptedConfig = await encryptConfigAsync(config);
+      const encryptedConfig = await encryptConfigAsync(normalizedConfig);
       onSave(encryptedConfig);
       setIsOpen(false);
       toast.success('✓ Configuration Saved');
@@ -625,6 +643,27 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ onSave, initialConfig 
         icon="fa-search"
         helpText="Optional: For enhanced product data lookup"
       />
+
+      <div className="grid grid-cols-2 gap-4">
+        <InputField
+          label="Call budget"
+          type="number"
+          value={String(config.serpApiCallBudget ?? 8)}
+          onChange={v => updateConfig('serpApiCallBudget', Math.max(1, Math.min(50, parseInt(v, 10) || 8)))}
+          error={validationErrors.serpApiCallBudget}
+          icon="fa-gauge-high"
+          helpText="Hard cap on SerpAPI requests per scan"
+        />
+        <InputField
+          label="Min candidate score"
+          type="number"
+          value={String(config.serpApiMinCandidateScore ?? 35)}
+          onChange={v => updateConfig('serpApiMinCandidateScore', Math.max(0, Math.min(100, parseInt(v, 10) || 35)))}
+          error={validationErrors.serpApiMinCandidateScore}
+          icon="fa-filter"
+          helpText="Higher = fewer, more selective product lookups"
+        />
+      </div>
 
       <InfoBox type="warning" icon="fa-triangle-exclamation">
         SerpApi key enables accurate product images and real-time pricing. 

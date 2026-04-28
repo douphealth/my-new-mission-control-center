@@ -42,6 +42,7 @@ import {
   generateProductBoxHtml,
   generateComparisonTableHtml,
   fetchProductByASIN,
+  sanitizeAppConfig,
 } from '../utils';
 
 import { ProductBoxPreview } from './ProductBoxPreview';
@@ -93,6 +94,7 @@ interface ScanProgress {
   candidatesEvaluated?: number;
   productsKept?: number;
   skipped?: number;
+  skippedItems?: Array<{ name: string; reason: string; detail?: string }>;
 }
 
 interface ScanReportSummary {
@@ -164,6 +166,57 @@ const ScanProgressOverlay: React.FC<{ progress: ScanProgress | null }> = ({ prog
   );
 };
 
+const ScanTelemetryPanel: React.FC<{
+  progress: ScanProgress | null;
+  report: ScanReportSummary | null;
+}> = ({ progress, report }) => {
+  const skipped = progress?.skippedItems?.length ? progress.skippedItems : report?.skipped || [];
+  const callsUsed = progress?.serpApiCallsUsed ?? report?.serpApiCallsUsed ?? 0;
+  const budget = progress?.serpApiCallBudget ?? report?.serpApiCallBudget ?? 0;
+  const remaining = Math.max(0, budget - callsUsed);
+
+  if (!progress && !report) return null;
+
+  return (
+    <div className="mt-4 rounded-[24px] border border-dark-700 bg-dark-950/70 p-4 space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-2xl border border-dark-800 bg-dark-900 px-3 py-3">
+          <p className="text-[9px] font-black uppercase tracking-[0.28em] text-gray-500">Calls used</p>
+          <p className="mt-2 text-lg font-black text-white">{callsUsed}</p>
+        </div>
+        <div className="rounded-2xl border border-dark-800 bg-dark-900 px-3 py-3">
+          <p className="text-[9px] font-black uppercase tracking-[0.28em] text-gray-500">Remaining</p>
+          <p className="mt-2 text-lg font-black text-white">{remaining}</p>
+        </div>
+        <div className="rounded-2xl border border-dark-800 bg-dark-900 px-3 py-3">
+          <p className="text-[9px] font-black uppercase tracking-[0.28em] text-gray-500">Skipped</p>
+          <p className="mt-2 text-lg font-black text-white">{progress?.skipped ?? report?.skipped.length ?? 0}</p>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-dark-800 bg-dark-900 px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[9px] font-black uppercase tracking-[0.28em] text-gray-500">Live skip log</p>
+          {report?.budgetExhausted && <span className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-400">Budget reached</span>}
+        </div>
+        {skipped.length === 0 ? (
+          <p className="mt-3 text-xs text-gray-500">No products skipped yet.</p>
+        ) : (
+          <div className="mt-3 max-h-52 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+            {skipped.map((item, index) => (
+              <div key={`${item.name}-${item.reason}-${index}`} className="rounded-xl border border-dark-800 bg-dark-950 px-3 py-2">
+                <p className="truncate text-xs font-bold text-white">{item.name}</p>
+                <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-brand-400">{item.reason.replace(/_/g, ' ')}</p>
+                {item.detail && <p className="mt-1 text-[11px] leading-relaxed text-gray-500">{item.detail}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 /** Small badge showing product count in header area */
 const ProductCountBadge: React.FC<{ placed: number; total: number }> = ({ placed, total }) => (
   <div className="flex items-center gap-1.5 bg-dark-800/70 px-3 py-1 rounded-full">
@@ -177,6 +230,7 @@ const ProductCountBadge: React.FC<{ placed: number; total: number }> = ({ placed
 // ============================================================================
 
 export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) => {
+  const normalizedConfig = useMemo(() => sanitizeAppConfig(config), [config]);
   // ========================================================================
   // STATE
   // ========================================================================
@@ -243,7 +297,7 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
       setStatus('fetching');
 
       try {
-        const result = await fetchRawPostContent(config, post.id, post.url || '');
+        const result = await fetchRawPostContent(normalizedConfig, post.id, post.url || '');
         if (!mounted) return;
 
         if (!result.content || result.content.length < 10) {
@@ -552,6 +606,7 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
   const runDeepScan = useCallback(async () => {
     setStatus('analyzing');
     setScanProgress({ stage: 'Initializing scan…', current: 0, total: 6 });
+    setScanReport(null);
 
     try {
       if (!config.aiProvider) throw new Error('AI provider not configured. Please configure AI settings.');
@@ -569,7 +624,7 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
       const precisionResult = await tryPrecisionDetect(
         post.title,
         currentHtml,
-        config,
+        normalizedConfig,
         (stage, current, total) => setScanProgress({ stage, current, total }),
       );
 
@@ -584,10 +639,42 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
       } else {
         // 2. Fallback to legacy scan
         setScanProgress({ stage: 'Falling back to legacy scan…', current: 3, total: 6 });
-        const legacy = await analyzeContentAndFindProduct(post.title, currentHtml, config);
+        const legacy = await analyzeContentAndFindProduct(post.title, currentHtml, normalizedConfig, {
+          onProgress: (event) => {
+            setScanProgress((prev) => ({
+              stage: event.stage,
+              current: prev?.current ?? 4,
+              total: prev?.total ?? 6,
+              message: event.message,
+              serpApiCallsUsed: event.serpApiCallsUsed,
+              serpApiCallBudget: event.serpApiCallBudget,
+              candidatesEvaluated: event.candidatesEvaluated,
+              productsKept: event.productsKept,
+              skipped: event.skipped,
+              skippedItems: event.skippedItems,
+            }));
+          },
+        });
         products = legacy.detectedProducts;
         comparison = legacy.comparison;
         candidateCount = products.length;
+        setScanReport(
+          legacy.scanReport
+            ? {
+                serpApiCallsUsed: legacy.scanReport.serpApiCallsUsed,
+                serpApiCallBudget: legacy.scanReport.serpApiCallBudget,
+                budgetExhausted: legacy.scanReport.budgetExhausted,
+                serpApiRetries: legacy.scanReport.serpApiRetries,
+                productsKept: legacy.scanReport.productsKept,
+                candidatesEvaluated: legacy.scanReport.candidatesEvaluated,
+                skipped: legacy.scanReport.skipped.map((item) => ({
+                  name: item.name,
+                  reason: item.reason,
+                  detail: item.detail,
+                })),
+              }
+            : null,
+        );
       }
 
       // 3. Merge results into product map
@@ -632,7 +719,7 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
       setStatus('idle');
       setScanProgress(null);
     }
-  }, [config, editorNodes, post.title, productMap, setEditorNodes]);
+  }, [editorNodes, normalizedConfig, post.title, productMap, setEditorNodes]);
 
   // ========================================================================
   // NODE MANIPULATION
@@ -783,7 +870,7 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
     setStatus('pushing');
     try {
       const html = generateFinalHtml();
-      const link = await pushToWordPress(config, currentId, html);
+      const link = await pushToWordPress(normalizedConfig, currentId, html);
       toast('Production Sync Successful');
       window.open(link, '_blank');
     } catch (e: any) {
@@ -791,7 +878,7 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
     } finally {
       setStatus('idle');
     }
-  }, [generateFinalHtml, config, currentId]);
+  }, [generateFinalHtml, normalizedConfig, currentId]);
 
   // ========================================================================
   // RENDER
@@ -877,6 +964,7 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
             </button>
 
             <ScanProgressOverlay progress={scanProgress} />
+            <ScanTelemetryPanel progress={scanProgress} report={scanReport} />
           </div>
 
           {/* ---- MANUAL ADD CARD ---- */}

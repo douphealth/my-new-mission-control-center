@@ -17,12 +17,14 @@ export const AppConfigSchema = z.object({
   amazonRegion: AmazonRegionSchema.default('us-east-1'),
   
   // WordPress
-  wpUrl: z.string().url('Must be a valid URL').regex(/\/wp-json\/v2$/, 'Must end with /wp-json/v2').default(''),
+  wpUrl: z.string().url('Must be a valid URL').default(''),
   wpUser: z.string().min(1, 'Username required').default(''),
   wpAppPassword: z.string().regex(/^\w{4} \w{4} \w{4} \w{4}$/, 'Invalid app password format').default(''),
   
   // SerpAPI
   serpApiKey: z.string().min(32, 'API key too short').default(''),
+  serpApiCallBudget: z.number().int().min(1).max(50).default(8),
+  serpApiMinCandidateScore: z.number().int().min(0).max(100).default(35),
   
   // AI
   aiProvider: AIProviderSchema.default('gemini'),
