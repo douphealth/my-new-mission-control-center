@@ -334,8 +334,171 @@ const SITEMAP_FETCH_TIMEOUT_MS = 20000;
 const PAGE_FETCH_TIMEOUT_MS = 15000;
 const API_TIMEOUT_MS = 30000;
 
+// SerpAPI budget defaults — overridable via AppConfig.serpApiCallBudget /
+// AppConfig.serpApiMinCandidateScore.
+const DEFAULT_SERPAPI_CALL_BUDGET = 8;
+const DEFAULT_SERPAPI_MIN_CANDIDATE_SCORE = 35;
+const SERPAPI_BACKOFF_BASE_MS = 800;
+const SERPAPI_BACKOFF_MAX_MS = 12000;
+const SERPAPI_MAX_ATTEMPTS = 4;
+// After this many consecutive transient failures, the budget halves to
+// stop hammering the upstream and still let the scan finish.
+const SERPAPI_DEGRADE_AFTER_FAILURES = 3;
+
 // Version for cache invalidation
 const CACHE_VERSION = 'v6';
+
+// ============================================================================
+// SERPAPI BUDGET TRACKER
+// ============================================================================
+
+export interface ScanProgressEvent {
+  stage: string;
+  message: string;
+  serpApiCallsUsed: number;
+  serpApiCallBudget: number;
+  candidatesEvaluated: number;
+  productsKept: number;
+  skipped: number;
+}
+
+export type ScanProgressHandler = (event: ScanProgressEvent) => void;
+
+class BudgetTracker {
+  callsUsed = 0;
+  retries = 0;
+  candidatesEvaluated = 0;
+  productsKept = 0;
+  consecutiveFailures = 0;
+  budgetExhausted = false;
+  skipped: SkippedCandidate[] = [];
+  stages: Array<{ name: string; durationMs: number }> = [];
+  private currentBudget: number;
+  private stageStart = 0;
+  private currentStage = '';
+
+  constructor(
+    public readonly originalBudget: number,
+    private readonly onProgress?: ScanProgressHandler,
+  ) {
+    this.currentBudget = originalBudget;
+  }
+
+  get budget(): number {
+    return this.currentBudget;
+  }
+
+  canSpend(): boolean {
+    if (this.callsUsed >= this.currentBudget) {
+      this.budgetExhausted = true;
+      return false;
+    }
+    return true;
+  }
+
+  recordCall(retries: number) {
+    this.callsUsed += 1;
+    this.retries += retries;
+  }
+
+  recordSuccess() {
+    this.consecutiveFailures = 0;
+  }
+
+  recordFailure() {
+    this.consecutiveFailures += 1;
+    if (
+      this.consecutiveFailures >= SERPAPI_DEGRADE_AFTER_FAILURES &&
+      this.currentBudget > this.callsUsed + 1
+    ) {
+      // Degrade gracefully: cut remaining budget in half so we stop burning
+      // calls when SerpAPI is clearly unhealthy.
+      const remaining = this.currentBudget - this.callsUsed;
+      this.currentBudget = this.callsUsed + Math.max(1, Math.floor(remaining / 2));
+    }
+  }
+
+  skip(name: string, reason: SkipReason, detail?: string, confidence?: number) {
+    this.skipped.push({ name, reason, detail, confidence });
+    this.emit('skip', `Skipped "${name.slice(0, 60)}" — ${reason}`);
+  }
+
+  countCandidate() {
+    this.candidatesEvaluated += 1;
+  }
+
+  countProductKept() {
+    this.productsKept += 1;
+  }
+
+  startStage(name: string, message?: string) {
+    if (this.currentStage) {
+      this.endStage();
+    }
+    this.currentStage = name;
+    this.stageStart = Date.now();
+    this.emit(name, message || name);
+  }
+
+  endStage() {
+    if (!this.currentStage) return;
+    this.stages.push({
+      name: this.currentStage,
+      durationMs: Date.now() - this.stageStart,
+    });
+    this.currentStage = '';
+  }
+
+  emit(stage: string, message: string) {
+    if (!this.onProgress) return;
+    try {
+      this.onProgress({
+        stage,
+        message,
+        serpApiCallsUsed: this.callsUsed,
+        serpApiCallBudget: this.currentBudget,
+        candidatesEvaluated: this.candidatesEvaluated,
+        productsKept: this.productsKept,
+        skipped: this.skipped.length,
+      });
+    } catch {
+      // Progress handler errors must never break the scan.
+    }
+  }
+
+  finalize(): ScanReport {
+    this.endStage();
+    return {
+      serpApiCallsUsed: this.callsUsed,
+      serpApiCallBudget: this.originalBudget,
+      budgetExhausted: this.budgetExhausted,
+      serpApiRetries: this.retries,
+      candidatesEvaluated: this.candidatesEvaluated,
+      productsKept: this.productsKept,
+      skipped: this.skipped,
+      stages: this.stages,
+    };
+  }
+}
+
+function resolveSerpApiBudget(config: AppConfig, contentBudget: number): number {
+  const configured = Math.max(
+    1,
+    Math.floor(config.serpApiCallBudget ?? DEFAULT_SERPAPI_CALL_BUDGET),
+  );
+  // Never let the per-call budget run wildly above what the content can use.
+  // Allow 2 extra slots over the content-derived product budget for retries
+  // (ASIN attempt + search fallback).
+  return Math.min(configured, contentBudget * 2 + 2);
+}
+
+function resolveMinCandidateScore(config: AppConfig): number {
+  const value = config.serpApiMinCandidateScore;
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return DEFAULT_SERPAPI_MIN_CANDIDATE_SCORE;
+  }
+  return Math.max(0, Math.min(100, value));
+}
 
 const upgradeAmazonImageToHighRes = (imageUrl: string): string => {
   if (!imageUrl || typeof imageUrl !== 'string') return '';
