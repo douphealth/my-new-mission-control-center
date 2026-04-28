@@ -147,6 +147,21 @@ export interface AppConfig {
   
   /** Selected product box style */
   boxStyle: BoxStyle;
+
+  // ========== SerpAPI Budget Controls ==========
+  /**
+   * Hard cap on SerpAPI calls per scan. When the budget is reached, the
+   * scanner stops issuing new requests and returns whatever was found.
+   * Defaults to 8 if unset.
+   */
+  serpApiCallBudget?: number;
+
+  /**
+   * Minimum candidate relevance score required before a SerpAPI call is
+   * spent on it. Lower = more aggressive lookups, higher = more selective.
+   * Defaults to 35 if unset.
+   */
+  serpApiMinCandidateScore?: number;
 }
 
 /**
@@ -773,6 +788,55 @@ export interface AnalysisResult {
   
   /** Processing time (ms) */
   processingTime?: number;
+
+  /** Detailed scan telemetry — populated by the scanner */
+  scanReport?: ScanReport;
+}
+
+/**
+ * Reason a candidate product was not turned into a final placement.
+ */
+export type SkipReason =
+  | 'budget_exhausted'
+  | 'low_score'
+  | 'duplicate'
+  | 'serpapi_error'
+  | 'serpapi_rate_limit'
+  | 'no_amazon_match'
+  | 'invalid_query'
+  | 'fatal_serpapi';
+
+export interface SkippedCandidate {
+  name: string;
+  reason: SkipReason;
+  detail?: string;
+  confidence?: number;
+}
+
+export interface ScanReport {
+  /** Total SerpAPI HTTP calls actually issued during the scan */
+  serpApiCallsUsed: number;
+
+  /** SerpAPI call budget for this scan */
+  serpApiCallBudget: number;
+
+  /** True if the scanner stopped because the budget was reached */
+  budgetExhausted: boolean;
+
+  /** Total retries spent on backoff (rate limit / transient errors) */
+  serpApiRetries: number;
+
+  /** Number of candidates considered before SerpAPI verification */
+  candidatesEvaluated: number;
+
+  /** Number of candidates that survived selection and produced a product */
+  productsKept: number;
+
+  /** Per-candidate skip log so the UI can explain decisions */
+  skipped: SkippedCandidate[];
+
+  /** Stage-by-stage timeline */
+  stages: Array<{ name: string; durationMs: number }>;
 }
 
 /**

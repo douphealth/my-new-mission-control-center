@@ -44,6 +44,7 @@ function Landing() {
           <div className="flex items-center gap-3">
             <Link
               to="/login"
+              search={{ redirect: '/dashboard' }}
               className="text-sm font-bold text-gray-400 hover:text-white px-3 py-2 transition"
             >
               Sign in
@@ -82,6 +83,7 @@ function Landing() {
           </Link>
           <Link
             to="/login"
+            search={{ redirect: '/dashboard' }}
             className="text-gray-300 hover:text-white font-bold px-6 py-3 rounded-xl border border-dark-800 hover:border-dark-700 transition"
           >
             Sign in

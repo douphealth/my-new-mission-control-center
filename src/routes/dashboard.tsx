@@ -17,7 +17,7 @@ function DashboardChrome() {
 
   useEffect(() => {
     if (!loading && !session) {
-      router.navigate({ to: '/login' });
+      router.navigate({ to: '/login', search: { redirect: '/dashboard' } });
     }
   }, [loading, router, session]);
 
@@ -35,7 +35,7 @@ function DashboardChrome() {
 
   const handleSignOut = async () => {
     await signOut();
-    router.navigate({ to: '/login' });
+    router.navigate({ to: '/login', search: { redirect: '/dashboard' } });
   };
 
   return (

@@ -334,8 +334,171 @@ const SITEMAP_FETCH_TIMEOUT_MS = 20000;
 const PAGE_FETCH_TIMEOUT_MS = 15000;
 const API_TIMEOUT_MS = 30000;
 
+// SerpAPI budget defaults — overridable via AppConfig.serpApiCallBudget /
+// AppConfig.serpApiMinCandidateScore.
+const DEFAULT_SERPAPI_CALL_BUDGET = 8;
+const DEFAULT_SERPAPI_MIN_CANDIDATE_SCORE = 35;
+const SERPAPI_BACKOFF_BASE_MS = 800;
+const SERPAPI_BACKOFF_MAX_MS = 12000;
+const SERPAPI_MAX_ATTEMPTS = 4;
+// After this many consecutive transient failures, the budget halves to
+// stop hammering the upstream and still let the scan finish.
+const SERPAPI_DEGRADE_AFTER_FAILURES = 3;
+
 // Version for cache invalidation
 const CACHE_VERSION = 'v6';
+
+// ============================================================================
+// SERPAPI BUDGET TRACKER
+// ============================================================================
+
+export interface ScanProgressEvent {
+  stage: string;
+  message: string;
+  serpApiCallsUsed: number;
+  serpApiCallBudget: number;
+  candidatesEvaluated: number;
+  productsKept: number;
+  skipped: number;
+}
+
+export type ScanProgressHandler = (event: ScanProgressEvent) => void;
+
+class BudgetTracker {
+  callsUsed = 0;
+  retries = 0;
+  candidatesEvaluated = 0;
+  productsKept = 0;
+  consecutiveFailures = 0;
+  budgetExhausted = false;
+  skipped: SkippedCandidate[] = [];
+  stages: Array<{ name: string; durationMs: number }> = [];
+  private currentBudget: number;
+  private stageStart = 0;
+  private currentStage = '';
+
+  constructor(
+    public readonly originalBudget: number,
+    private readonly onProgress?: ScanProgressHandler,
+  ) {
+    this.currentBudget = originalBudget;
+  }
+
+  get budget(): number {
+    return this.currentBudget;
+  }
+
+  canSpend(): boolean {
+    if (this.callsUsed >= this.currentBudget) {
+      this.budgetExhausted = true;
+      return false;
+    }
+    return true;
+  }
+
+  recordCall(retries: number) {
+    this.callsUsed += 1;
+    this.retries += retries;
+  }
+
+  recordSuccess() {
+    this.consecutiveFailures = 0;
+  }
+
+  recordFailure() {
+    this.consecutiveFailures += 1;
+    if (
+      this.consecutiveFailures >= SERPAPI_DEGRADE_AFTER_FAILURES &&
+      this.currentBudget > this.callsUsed + 1
+    ) {
+      // Degrade gracefully: cut remaining budget in half so we stop burning
+      // calls when SerpAPI is clearly unhealthy.
+      const remaining = this.currentBudget - this.callsUsed;
+      this.currentBudget = this.callsUsed + Math.max(1, Math.floor(remaining / 2));
+    }
+  }
+
+  skip(name: string, reason: SkipReason, detail?: string, confidence?: number) {
+    this.skipped.push({ name, reason, detail, confidence });
+    this.emit('skip', `Skipped "${name.slice(0, 60)}" — ${reason}`);
+  }
+
+  countCandidate() {
+    this.candidatesEvaluated += 1;
+  }
+
+  countProductKept() {
+    this.productsKept += 1;
+  }
+
+  startStage(name: string, message?: string) {
+    if (this.currentStage) {
+      this.endStage();
+    }
+    this.currentStage = name;
+    this.stageStart = Date.now();
+    this.emit(name, message || name);
+  }
+
+  endStage() {
+    if (!this.currentStage) return;
+    this.stages.push({
+      name: this.currentStage,
+      durationMs: Date.now() - this.stageStart,
+    });
+    this.currentStage = '';
+  }
+
+  emit(stage: string, message: string) {
+    if (!this.onProgress) return;
+    try {
+      this.onProgress({
+        stage,
+        message,
+        serpApiCallsUsed: this.callsUsed,
+        serpApiCallBudget: this.currentBudget,
+        candidatesEvaluated: this.candidatesEvaluated,
+        productsKept: this.productsKept,
+        skipped: this.skipped.length,
+      });
+    } catch {
+      // Progress handler errors must never break the scan.
+    }
+  }
+
+  finalize(): ScanReport {
+    this.endStage();
+    return {
+      serpApiCallsUsed: this.callsUsed,
+      serpApiCallBudget: this.originalBudget,
+      budgetExhausted: this.budgetExhausted,
+      serpApiRetries: this.retries,
+      candidatesEvaluated: this.candidatesEvaluated,
+      productsKept: this.productsKept,
+      skipped: this.skipped,
+      stages: this.stages,
+    };
+  }
+}
+
+function resolveSerpApiBudget(config: AppConfig, contentBudget: number): number {
+  const configured = Math.max(
+    1,
+    Math.floor(config.serpApiCallBudget ?? DEFAULT_SERPAPI_CALL_BUDGET),
+  );
+  // Never let the per-call budget run wildly above what the content can use.
+  // Allow 2 extra slots over the content-derived product budget for retries
+  // (ASIN attempt + search fallback).
+  return Math.min(configured, contentBudget * 2 + 2);
+}
+
+function resolveMinCandidateScore(config: AppConfig): number {
+  const value = config.serpApiMinCandidateScore;
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return DEFAULT_SERPAPI_MIN_CANDIDATE_SCORE;
+  }
+  return Math.max(0, Math.min(100, value));
+}
 
 const upgradeAmazonImageToHighRes = (imageUrl: string): string => {
   if (!imageUrl || typeof imageUrl !== 'string') return '';
@@ -408,7 +571,10 @@ interface AnalysisResult {
   monetizationPotential: 'high' | 'medium' | 'low';
   keywords?: string[];
   suggestedPlacements?: number[];
+  scanReport?: import('./types').ScanReport;
 }
+
+import type { ScanReport, SkippedCandidate, SkipReason } from './types';
 
 interface ConnectionTestResult {
   success: boolean;
@@ -1864,11 +2030,23 @@ Return empty products array ONLY if there are truly no identifiable products in 
 
 /**
  * Analyze content and find monetizable products - SOTA Multi-Phase Detection
+ *
+ * Options:
+ *  - onProgress: receives ScanProgressEvent updates so the UI can show how
+ *    many SerpAPI calls have been used and why candidates were skipped.
+ *  - budgetOverride: hard override for the SerpAPI call budget. Falls back to
+ *    AppConfig.serpApiCallBudget, then DEFAULT_SERPAPI_CALL_BUDGET.
  */
+export interface AnalyzeContentOptions {
+  onProgress?: ScanProgressHandler;
+  budgetOverride?: number;
+}
+
 export const analyzeContentAndFindProduct = async (
   title: string,
   content: string,
-  config: AppConfig
+  config: AppConfig,
+  options: AnalyzeContentOptions = {},
 ): Promise<AnalysisResult> => {
   const contentHash = hashString(`${title}_${content.substring(0, 500)}_${content.length}_v2`);
 
@@ -1879,6 +2057,16 @@ export const analyzeContentAndFindProduct = async (
       comparison: cached.comparison,
       contentType: 'cached',
       monetizationPotential: 'medium',
+      scanReport: {
+        serpApiCallsUsed: 0,
+        serpApiCallBudget: 0,
+        budgetExhausted: false,
+        serpApiRetries: 0,
+        candidatesEvaluated: cached.products.length,
+        productsKept: cached.products.length,
+        skipped: [],
+        stages: [{ name: 'cache_hit', durationMs: 0 }],
+      },
     };
   }
 
@@ -1893,6 +2081,18 @@ export const analyzeContentAndFindProduct = async (
   const phase1Products = extractProductsPhase1(truncatedContent, cleanContent);
   const lookupBudget = estimateLookupBudget(truncatedContent, phase1Products.length);
 
+  // Resolve SerpAPI budget — config-driven with sane defaults.
+  const callBudget =
+    typeof options.budgetOverride === 'number' && options.budgetOverride > 0
+      ? Math.floor(options.budgetOverride)
+      : resolveSerpApiBudget(config, lookupBudget);
+  const minScore = resolveMinCandidateScore(config);
+  const tracker = new BudgetTracker(callBudget, options.onProgress);
+  tracker.startStage(
+    'init',
+    `Budget: ${callBudget} SerpAPI calls · ${phase1Products.length} candidates detected`,
+  );
+
   // Check for SerpAPI key
   if (!config.serpApiKey || config.serpApiKey.trim().length === 0) {
     throw new Error('SerpAPI key is required for product detection. Add it in Settings > Amazon.');
@@ -1900,50 +2100,100 @@ export const analyzeContentAndFindProduct = async (
 
   // Fast path: use the strongest phase-1 signals first, but stay within a strict lookup budget.
   if (phase1Products.length > 0 && config.serpApiKey) {
+    tracker.startStage('phase1_lookup', 'Verifying high-confidence candidates against Amazon');
     const quickProducts: ProductDetails[] = [];
+    // Smart selection: keep only candidates above the score threshold,
+    // sorted by (confidence + ASIN-bonus). Cap to whatever the budget can
+    // actually afford; never queue more candidates than calls available.
     const prioritizedPhase1 = [...phase1Products]
-      .sort((a, b) => (b.confidence - a.confidence) || Number(Boolean(b.asin)) - Number(Boolean(a.asin)))
-      .slice(0, Math.min(phase1Products.length, Math.max(lookupBudget * 2, MAX_PHASE1_LOOKUPS)));
-    const maxPhase1 = prioritizedPhase1.length;
+      .map((p) => ({
+        ...p,
+        score: p.confidence + (p.asin ? 25 : 0),
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    for (const candidate of prioritizedPhase1) {
+      if (candidate.score < minScore && !candidate.asin) {
+        tracker.skip(candidate.name, 'low_score', `score ${candidate.score} < min ${minScore}`, candidate.confidence);
+      }
+    }
+
+    const eligible = prioritizedPhase1.filter((p) => p.score >= minScore || p.asin);
+    const maxPhase1 = Math.min(
+      eligible.length,
+      Math.max(lookupBudget * 2, MAX_PHASE1_LOOKUPS),
+      callBudget, // never plan more candidates than calls available
+    );
     let lastSerpError: string | null = null;
     let serpErrorCount = 0;
     let hasFatalSerpError = false;
 
     for (let i = 0; i < maxPhase1; i++) {
-      const p1 = prioritizedPhase1[i];
-      if (quickProducts.length >= lookupBudget) break;
+      if (tracker.budgetExhausted || !tracker.canSpend()) {
+        for (let j = i; j < maxPhase1; j++) {
+          tracker.skip(eligible[j].name, 'budget_exhausted', `budget ${callBudget} reached`);
+        }
+        break;
+      }
+
+      const p1 = eligible[i];
+      tracker.countCandidate();
+      if (quickProducts.length >= lookupBudget) {
+        tracker.skip(p1.name, 'duplicate', `placement budget ${lookupBudget} filled`);
+        continue;
+      }
 
       try {
         let productData: Partial<ProductDetails> = {};
 
         if (p1.asin) {
+          if (!tracker.canSpend()) {
+            tracker.skip(p1.name, 'budget_exhausted', `budget ${callBudget} reached`, p1.confidence);
+            break;
+          }
           try {
-            const result = await fetchProductByASIN(p1.asin, config.serpApiKey);
+            const result = await fetchProductByASIN(p1.asin, config.serpApiKey, tracker);
             if (result) productData = result;
           } catch (e: any) {
             if (e instanceof SerpApiError && e.isFatal) {
               hasFatalSerpError = true;
               lastSerpError = e.message;
+              tracker.skip(p1.name, 'fatal_serpapi', e.message, p1.confidence);
               break;
+            }
+            if (e instanceof SerpApiError && e.statusCode === 429) {
+              tracker.skip(p1.name, 'serpapi_rate_limit', e.message, p1.confidence);
             }
           }
         }
 
         if (!productData.asin) {
           if (!shouldUseSearchQuery(p1.name)) {
+            tracker.skip(p1.name, 'invalid_query', 'query too short for Amazon search', p1.confidence);
             continue;
           }
+          if (!tracker.canSpend()) {
+            tracker.skip(p1.name, 'budget_exhausted', `budget ${callBudget} reached`, p1.confidence);
+            break;
+          }
           try {
-            productData = await searchAmazonProduct(p1.name, config.serpApiKey);
+            productData = await searchAmazonProduct(p1.name, config.serpApiKey, tracker);
           } catch (e: any) {
             if (e instanceof SerpApiError && e.isFatal) {
               hasFatalSerpError = true;
               lastSerpError = e.message;
+              tracker.skip(p1.name, 'fatal_serpapi', e.message, p1.confidence);
               break;
             }
             if (e instanceof SerpApiError) {
               serpErrorCount++;
               lastSerpError = e.message;
+              tracker.skip(
+                p1.name,
+                e.statusCode === 429 ? 'serpapi_rate_limit' : 'serpapi_error',
+                e.message,
+                p1.confidence,
+              );
             }
             continue;
           }
@@ -1973,6 +2223,11 @@ export const analyzeContentAndFindProduct = async (
             specs: {},
             confidence: p1.confidence,
           });
+          tracker.countProductKept();
+        } else if (hasAsin) {
+          tracker.skip(p1.name, 'no_amazon_match', 'matched ASIN but no image/price', p1.confidence);
+        } else {
+          tracker.skip(p1.name, 'no_amazon_match', 'no ASIN returned', p1.confidence);
         }
 
         if (i < maxPhase1 - 1) {
@@ -1982,10 +2237,12 @@ export const analyzeContentAndFindProduct = async (
         if (e instanceof SerpApiError && e.isFatal) {
           hasFatalSerpError = true;
           lastSerpError = e.message;
+          tracker.skip(p1.name, 'fatal_serpapi', e.message, p1.confidence);
           break;
         }
       }
     }
+    tracker.endStage();
 
     if (hasFatalSerpError && lastSerpError) {
       throw new Error(`SerpAPI Error: ${lastSerpError}`);
@@ -2013,6 +2270,7 @@ export const analyzeContentAndFindProduct = async (
         comparison,
         contentType: 'informational',
         monetizationPotential: refinedQuickProducts.length >= 3 ? 'high' : 'medium',
+        scanReport: tracker.finalize(),
       };
     }
   }
@@ -2611,12 +2869,20 @@ const callSerpApiProxy = async (params: {
   query?: string;
   asin?: string;
   apiKey: string;
+  tracker?: BudgetTracker;
 }): Promise<any> => {
   if (!params.apiKey?.trim()) {
     throw new SerpApiError('SerpAPI key is required. Add it in Settings.', 0, true);
   }
 
-  let lastError: Error | null = null;
+  // Budget gate — when wired into a scan, refuse the call before we spend it.
+  if (params.tracker && !params.tracker.canSpend()) {
+    throw new SerpApiError(
+      `SerpAPI budget reached (${params.tracker.callsUsed}/${params.tracker.budget})`,
+      0,
+      false,
+    );
+  }
 
   const url = new URL(SERPAPI_BASE_URL);
   url.searchParams.set('api_key', params.apiKey.trim());
@@ -2637,17 +2903,17 @@ const callSerpApiProxy = async (params: {
     url.searchParams.set('num', String(SEARCH_RESULTS_LIMIT));
   }
 
-  // Retry with exponential backoff (max 3 attempts)
-  for (let attempt = 0; attempt < 3; attempt++) {
+  let lastError: Error | null = null;
+  let retriesUsed = 0;
+
+  for (let attempt = 0; attempt < SERPAPI_MAX_ATTEMPTS; attempt++) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
       const response = await fetch(url.toString(), {
         method: 'GET',
-        headers: {
-          Accept: 'application/json',
-        },
+        headers: { Accept: 'application/json' },
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -2662,46 +2928,88 @@ const callSerpApiProxy = async (params: {
       if (!response.ok) {
         const status = response.status;
         const msg = data?.error || `SerpAPI request failed: ${status}`;
+
+        // Fatal — never retry, never count as transient failure for the
+        // budget tracker; the caller will surface the error and stop.
         if (status === 401 || status === 402 || status === 403) {
+          if (params.tracker) {
+            params.tracker.recordCall(retriesUsed);
+            params.tracker.recordFailure();
+          }
           throw new SerpApiError(msg, status, true);
         }
 
+        // Rate limit — exponential backoff with jitter, then retry.
         if (status === 429) {
-          const waitMs = Math.pow(2, attempt) * 2000;
-          await new Promise(r => setTimeout(r, waitMs));
+          retriesUsed += 1;
+          const waitMs = Math.min(
+            SERPAPI_BACKOFF_MAX_MS,
+            SERPAPI_BACKOFF_BASE_MS * Math.pow(2, attempt) + Math.random() * 250,
+          );
+          if (params.tracker) {
+            params.tracker.emit(
+              'serpapi_rate_limit',
+              `Rate limited — backing off ${Math.round(waitMs)}ms (attempt ${attempt + 1}/${SERPAPI_MAX_ATTEMPTS})`,
+            );
+          }
+          await new Promise((r) => setTimeout(r, waitMs));
           continue;
         }
 
         lastError = new SerpApiError(msg, status, false);
-        continue;
-      }
-
-      if (data && typeof data === 'object' && data.error) {
+      } else if (data && typeof data === 'object' && data.error) {
         const message = String(data.error);
         const status = Number(data.search_metadata?.status_code || 500);
         if (status === 401 || status === 402 || status === 403) {
+          if (params.tracker) {
+            params.tracker.recordCall(retriesUsed);
+            params.tracker.recordFailure();
+          }
           throw new SerpApiError(message, status, true);
         }
         lastError = new SerpApiError(message, status || 500, false);
-        continue;
+      } else {
+        if (params.tracker) {
+          params.tracker.recordCall(retriesUsed);
+          params.tracker.recordSuccess();
+        }
+        return data;
       }
-
-      return data;
     } catch (e: any) {
       if (e?.name === 'AbortError') {
-        lastError = new SerpApiError('SerpAPI request timed out. Please try again.', 504, false);
-        continue;
+        lastError = new SerpApiError(
+          'SerpAPI request timed out. Please try again.',
+          504,
+          false,
+        );
+      } else if (e instanceof SerpApiError && e.isFatal) {
+        throw e;
+      } else {
+        lastError = e;
       }
-      if (e instanceof SerpApiError && e.isFatal) throw e;
-      lastError = e;
     }
 
-    // Exponential backoff between attempts
-    if (attempt < 2) {
-      await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));
+    // Exponential backoff with jitter before next attempt
+    if (attempt < SERPAPI_MAX_ATTEMPTS - 1) {
+      retriesUsed += 1;
+      const waitMs = Math.min(
+        SERPAPI_BACKOFF_MAX_MS,
+        SERPAPI_BACKOFF_BASE_MS * Math.pow(2, attempt) + Math.random() * 200,
+      );
+      if (params.tracker) {
+        params.tracker.emit(
+          'serpapi_retry',
+          `Transient error — retrying in ${Math.round(waitMs)}ms (attempt ${attempt + 1}/${SERPAPI_MAX_ATTEMPTS})`,
+        );
+      }
+      await new Promise((r) => setTimeout(r, waitMs));
     }
   }
 
+  if (params.tracker) {
+    params.tracker.recordCall(retriesUsed);
+    params.tracker.recordFailure();
+  }
   throw lastError || new SerpApiError('SerpAPI proxy failed after retries', 500, false);
 };
 
@@ -2774,7 +3082,8 @@ const extractReviewCount = (result: any): number => {
  */
 export const searchAmazonProduct = async (
   query: string,
-  apiKey: string
+  apiKey: string,
+  tracker?: BudgetTracker,
 ): Promise<Partial<ProductDetails>> => {
   const cleanKey = getApiKey(apiKey);
 
@@ -2795,6 +3104,7 @@ export const searchAmazonProduct = async (
     type: 'search',
     query,
     apiKey: cleanKey,
+    tracker,
   });
 
   const allResults = [
@@ -2897,7 +3207,8 @@ const extractProductImage = (result: any): string => {
  */
 export const fetchProductByASIN = async (
   asin: string,
-  apiKey: string
+  apiKey: string,
+  tracker?: BudgetTracker,
 ): Promise<ProductDetails | null> => {
   const cleanKey = getApiKey(apiKey);
 
@@ -2921,6 +3232,7 @@ export const fetchProductByASIN = async (
       type: 'product',
       asin,
       apiKey: cleanKey,
+      tracker,
     });
 
     const result = data.product_results || data.product_result;
