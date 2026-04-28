@@ -177,9 +177,22 @@ export function isSupabaseConnected(): boolean {
 
 export async function testSupabaseConnection(url: string, anonKey: string): Promise<{ ok: boolean; error?: string }> {
     try {
-        const client = createClient(url.trim(), anonKey.trim());
+        const normalizedUrl = url.trim();
+        const normalizedKey = anonKey.trim();
+        const current = getSupabaseConfig();
+        const client = current?.url === normalizedUrl && current.anonKey === normalizedKey
+            ? getSupabase()
+            : createClient(normalizedUrl, normalizedKey, {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false,
+                    detectSessionInUrl: false,
+                    storageKey: `mc-health-${new URL(normalizedUrl).host}`,
+                },
+            });
+        if (!client) throw new Error('Supabase client unavailable');
         const { error } = await client.from('mc_sync_log').select('id').limit(1);
-        if (error && error.code !== 'PGRST116' && error.code !== '42P01') {
+        if (error && error.code !== 'PGRST116' && error.code !== '42P01' && error.code !== 'PGRST205') {
             // PGRST116 = table doesn't exist yet — still means connection works
             throw error;
         }
