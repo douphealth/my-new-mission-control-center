@@ -1,38 +1,103 @@
-import { ClientOnly, createFileRoute } from '@tanstack/react-router';
-import { lazy, Suspense } from 'react';
-
-// Lazy-load the legacy App so it only runs on the client
-// (the Zustand store uses localStorage which is unavailable during SSR).
-const App = lazy(() => import('../../App'));
+import { createFileRoute, Link, redirect } from '@tanstack/react-router';
+import { supabase } from '../integrations/supabase/client';
 
 export const Route = createFileRoute('/')({
-  component: HomePage,
+  beforeLoad: async () => {
+    const { data } = await supabase.auth.getSession();
+    if (data.session) throw redirect({ to: '/dashboard' });
+  },
+  head: () => ({
+    meta: [
+      { title: 'AmzWP Automator — Amazon affiliate WordPress automation' },
+      {
+        name: 'description',
+        content:
+          'Generate Amazon-affiliate posts from your sitemap and publish to WordPress. AI-powered, EEAT-ready, with auto price refresh.',
+      },
+    ],
+  }),
+  component: Landing,
 });
 
-function HomePage() {
+function Landing() {
   return (
-    <ClientOnly
-      fallback={
-        <div className="h-dvh w-screen bg-dark-950 flex items-center justify-center">
-          <div className="relative w-20 h-20">
-            <div className="absolute inset-0 border-4 border-brand-500/20 rounded-full" />
-            <div className="absolute inset-0 border-4 border-transparent border-t-brand-500 rounded-full animate-spin" />
+    <div className="min-h-dvh bg-dark-950 text-white">
+      <header className="border-b border-dark-800">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <Link to="/" className="font-black text-lg tracking-tight">
+            AmzWP<span className="text-brand-500">.</span>
+          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/login"
+              className="text-sm font-bold text-gray-400 hover:text-white px-3 py-2 transition"
+            >
+              Sign in
+            </Link>
+            <Link
+              to="/signup"
+              className="text-sm font-bold bg-brand-500 hover:bg-brand-400 text-white px-4 py-2 rounded-lg transition"
+            >
+              Get started
+            </Link>
           </div>
         </div>
-      }
-    >
-      <Suspense
-        fallback={
-          <div className="h-dvh w-screen bg-dark-950 flex items-center justify-center">
-            <div className="relative w-20 h-20">
-              <div className="absolute inset-0 border-4 border-brand-500/20 rounded-full" />
-              <div className="absolute inset-0 border-4 border-transparent border-t-brand-500 rounded-full animate-spin" />
-            </div>
-          </div>
-        }
-      >
-        <App />
-      </Suspense>
-    </ClientOnly>
+      </header>
+
+      <section className="max-w-4xl mx-auto px-6 pt-24 pb-20 text-center">
+        <p className="text-xs uppercase tracking-[0.3em] text-brand-400 font-bold mb-6">
+          Amazon affiliate · WordPress · AI
+        </p>
+        <h1 className="text-5xl md:text-6xl font-black tracking-tight mb-6">
+          Stop hand-publishing.
+          <br />
+          <span className="bg-gradient-to-r from-brand-400 to-brand-600 bg-clip-text text-transparent">
+            Automate your affiliate site.
+          </span>
+        </h1>
+        <p className="text-lg text-gray-400 max-w-2xl mx-auto mb-10">
+          Scan a sitemap, generate AI-optimized Amazon-affiliate content, and publish to WordPress in
+          minutes. Built for affiliate marketers who manage multiple sites.
+        </p>
+        <div className="flex items-center justify-center gap-3">
+          <Link
+            to="/signup"
+            className="bg-brand-500 hover:bg-brand-400 text-white font-bold px-6 py-3 rounded-xl transition"
+          >
+            Create free account
+          </Link>
+          <Link
+            to="/login"
+            className="text-gray-300 hover:text-white font-bold px-6 py-3 rounded-xl border border-dark-800 hover:border-dark-700 transition"
+          >
+            Sign in
+          </Link>
+        </div>
+      </section>
+
+      <section className="max-w-5xl mx-auto px-6 pb-24 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Feature
+          title="Sitemap-first scanning"
+          desc="Point us at your WP sitemap and we'll surface every post that's missing affiliate boxes or has stale prices."
+        />
+        <Feature
+          title="AI-written, EEAT-ready"
+          desc="Reviews, comparison tables, and product boxes generated with real product data — not generic fluff."
+        />
+        <Feature
+          title="Multi-site management"
+          desc="Run as many WordPress sites as you want from one dashboard. Stop juggling logins."
+        />
+      </section>
+    </div>
+  );
+}
+
+function Feature({ title, desc }: { title: string; desc: string }) {
+  return (
+    <div className="bg-dark-900 border border-dark-800 rounded-2xl p-6">
+      <h3 className="font-bold mb-2">{title}</h3>
+      <p className="text-sm text-gray-500 leading-relaxed">{desc}</p>
+    </div>
   );
 }
