@@ -1,26 +1,37 @@
 import {
   createFileRoute,
   Outlet,
-  redirect,
   useRouter,
   Link,
 } from '@tanstack/react-router';
+import { useEffect } from 'react';
 import { useAuth } from '../lib/auth';
-import { supabase } from '../integrations/supabase/client';
 
 export const Route = createFileRoute('/dashboard')({
-  beforeLoad: async () => {
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) {
-      throw redirect({ to: '/login' });
-    }
-  },
   component: DashboardChrome,
 });
 
 function DashboardChrome() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading, session } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !session) {
+      router.navigate({ to: '/login' });
+    }
+  }, [loading, router, session]);
+
+  if (loading) {
+    return (
+      <div className="min-h-dvh bg-dark-950 flex items-center justify-center text-gray-400">
+        Loading…
+      </div>
+    );
+  }
+
+  if (!session) {
+    return null;
+  }
 
   const handleSignOut = async () => {
     await signOut();

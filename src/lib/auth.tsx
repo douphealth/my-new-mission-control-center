@@ -12,8 +12,8 @@ interface AuthState {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null; session: Session | null }>;
+  signUp: (email: string, password: string) => Promise<{ error: Error | null; session: Session | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -24,18 +24,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const syncSession = (nextSession: Session | null) => {
+    setSession(nextSession);
+    setUser(nextSession?.user ?? null);
+  };
+
   useEffect(() => {
     // CRITICAL: subscribe FIRST, then load existing session.
     const { data: sub } = supabase.auth.onAuthStateChange(
       (_event: AuthChangeEvent, s: Session | null) => {
-        setSession(s);
-        setUser(s?.user ?? null);
+        syncSession(s);
+        setLoading(false);
       }
     );
 
     supabase.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
-      setSession(data.session);
-      setUser(data.session?.user ?? null);
+      syncSession(data.session);
       setLoading(false);
     });
 
@@ -43,12 +47,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error };
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (data.session) syncSession(data.session);
+    return { error, session: data.session ?? null };
   };
 
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -56,11 +61,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           typeof window !== 'undefined' ? `${window.location.origin}/dashboard` : undefined,
       },
     });
-    return { error };
+    if (data.session) syncSession(data.session);
+    return { error, session: data.session ?? null };
   };
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    syncSession(null);
   };
 
   return (
