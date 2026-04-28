@@ -10,6 +10,7 @@ let realtimeChannel: RealtimeChannel | null = null;
 let syncCallbacks: (() => void)[] = [];
 let schemaAvailability: Record<string, boolean> | null = null;
 let schemaErrors: SyncSchemaError[] = [];
+let schemaAvailabilityCheckedAt = 0;
 
 const DEFAULT_SUPABASE_URL = 'https://dszpokkqhrtjutmvcxnh.supabase.co';
 const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_DR3JoohreA2S4Z3akVmICQ_ZZp2DSnW';
@@ -104,8 +105,16 @@ function chunkArray<T>(items: T[], size: number): T[][] {
     return chunks;
 }
 
-async function getAvailableRemoteTables(client: SupabaseClient): Promise<Record<string, boolean>> {
-    if (schemaAvailability) return schemaAvailability;
+export function refreshSupabaseSchemaState(): void {
+    schemaAvailability = null;
+    schemaErrors = [];
+    schemaAvailabilityCheckedAt = 0;
+}
+
+async function getAvailableRemoteTables(client: SupabaseClient, options?: { force?: boolean }): Promise<Record<string, boolean>> {
+    const cacheAge = Date.now() - schemaAvailabilityCheckedAt;
+    if (!options?.force && schemaAvailability && cacheAge < 30000) return schemaAvailability;
+    schemaErrors = [];
     const checks = await Promise.all(
         REQUIRED_REMOTE_TABLES.map(async (table) => {
             const { error } = await client.from(table).select('id').limit(1);
@@ -134,6 +143,7 @@ async function getAvailableRemoteTables(client: SupabaseClient): Promise<Record<
         })
     );
     schemaAvailability = Object.fromEntries(checks);
+    schemaAvailabilityCheckedAt = Date.now();
     return schemaAvailability;
 }
 
@@ -162,8 +172,7 @@ export function setSupabaseConfig(url: string, anonKey: string): void {
         realtimeChannel.unsubscribe();
         realtimeChannel = null;
     }
-    schemaAvailability = null;
-    schemaErrors = [];
+    refreshSupabaseSchemaState();
     supabaseClient = null;
 }
 
@@ -175,8 +184,7 @@ export function clearSupabaseConfig(): void {
         realtimeChannel.unsubscribe();
         realtimeChannel = null;
     }
-    schemaAvailability = null;
-    schemaErrors = [];
+    refreshSupabaseSchemaState();
     supabaseClient = null;
 }
 

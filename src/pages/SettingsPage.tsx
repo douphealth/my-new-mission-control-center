@@ -10,7 +10,7 @@ import {
 import {
   getSupabaseConfig, setSupabaseConfig, clearSupabaseConfig,
   testSupabaseConnection, pullFromSupabase, fullSync,
-  isSupabaseConnected, SUPABASE_SCHEMA_SQL, getLastSyncTime
+  isSupabaseConnected, SUPABASE_SCHEMA_SQL, getLastSyncTime, refreshSupabaseSchemaState
 } from "@/lib/supabase";
 import { generateStrongKey, setEncryptionKey, hasCustomEncryptionKey } from "@/lib/encryption";
 import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
@@ -82,10 +82,17 @@ export default function SettingsPage() {
   const [showEncKey, setShowEncKey] = useState(false);
   const [hasCustomKey, setHasCustomKey] = useState(hasCustomEncryptionKey());
 
+  const refreshSchemaStatus = async () => {
+    refreshSupabaseSchemaState();
+    const result = await testSupabaseConnection(sbUrl, sbKey);
+    setSbSchemaReady(result.schemaReady);
+    return result;
+  };
+
   useEffect(() => {
     if (sbConnected) {
       getLastSyncTime().then(setSbLastSync);
-      testSupabaseConnection(sbUrl, sbKey).then(result => setSbSchemaReady(result.schemaReady)).catch(() => setSbSchemaReady(false));
+      refreshSchemaStatus().catch(() => setSbSchemaReady(false));
     }
   }, [sbConnected]);
 
@@ -160,8 +167,7 @@ export default function SettingsPage() {
     if (!sbUrl || !sbKey) { toast.error("Enter URL and anon key first"); return; }
     setSbTesting(true);
     setSbTestResult(null);
-    const result = await testSupabaseConnection(sbUrl, sbKey);
-    setSbSchemaReady(result.schemaReady);
+    const result = await refreshSchemaStatus();
     setSbTestResult({ ok: result.ok, msg: result.ok ? "Supabase connected and schema is ready." : result.error || "Connection failed" });
     setSbTesting(false);
   };
@@ -171,7 +177,8 @@ export default function SettingsPage() {
     setSupabaseConfig(sbUrl, sbKey);
     setSbConnected(true);
     setSbSchemaReady(false);
-    toast.success("Supabase connection saved");
+    toast.success("Supabase connection saved — testing schema now");
+    refreshSchemaStatus().catch(() => setSbSchemaReady(false));
   };
 
   const handleDisconnectSupabase = () => {
@@ -185,6 +192,7 @@ export default function SettingsPage() {
 
   const handleSyncNow = async () => {
     setSbSyncing('sync');
+    refreshSupabaseSchemaState();
     const result = await fullSync();
     setSbSyncing(null);
 
@@ -199,6 +207,7 @@ export default function SettingsPage() {
 
   const handleRefreshFromCloud = async () => {
     setSbSyncing('refresh');
+    refreshSupabaseSchemaState();
     const result = await pullFromSupabase();
     setSbSyncing(null);
 
