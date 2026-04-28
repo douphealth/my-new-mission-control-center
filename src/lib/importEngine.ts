@@ -1080,6 +1080,14 @@ export function autoMapFields(sourceFields: string[], target: ImportTarget): Rec
 
 // ─── Normalization ────────────────────────────────────────────────────────────
 
+function normalizeWebsiteStatus(value: string): 'active' | 'maintenance' | 'down' | 'archived' {
+  const v = normalize(value || 'active');
+  if (['maintenance', 'maint', 'updating'].includes(v)) return 'maintenance';
+  if (['down', 'offline', 'outage', 'inactive'].includes(v)) return 'down';
+  if (['archived', 'archive', 'retired'].includes(v)) return 'archived';
+  return 'active';
+}
+
 export function normalizeItems(
   rows: Record<string, string>[],
   target: ImportTarget,
