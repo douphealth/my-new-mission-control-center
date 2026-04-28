@@ -2500,6 +2500,7 @@ export const analyzeContentAndFindProduct = async (
       contentType: parsed.contentType || 'informational',
       monetizationPotential: refinedProducts.length >= 3 ? 'high' : refinedProducts.length > 0 ? 'medium' : 'low',
       keywords: parsed.suggestedKeywords || [],
+      scanReport: tracker.finalize(),
     };
 
   } catch (error: any) {
@@ -2570,6 +2571,7 @@ export const analyzeContentAndFindProduct = async (
           detectedProducts: refinedFallbackProducts,
           contentType: 'informational',
           monetizationPotential: refinedFallbackProducts.length >= 3 ? 'high' : 'medium',
+          scanReport: tracker.finalize(),
         };
       }
 
