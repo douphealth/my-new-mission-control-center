@@ -72,7 +72,7 @@ const TopBar = forwardRef<HTMLElement>(function TopBar(_props, ref) {
 
   return (
     <>
-      <header ref={ref} className="sticky top-0 z-30 bg-card/80 backdrop-blur-2xl border-b border-border/15 px-3 sm:px-6 lg:px-8 h-14 sm:h-[72px] flex items-center gap-2 sm:gap-3">
+      <header ref={ref} className="enterprise-panel sticky top-0 z-30 px-3 sm:px-6 lg:px-8 h-14 sm:h-[72px] flex items-center gap-2 sm:gap-3 border-x-0 border-t-0 rounded-none shadow-none">
         {/* Mobile menu */}
         <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-muted-foreground hover:text-foreground p-2 -ml-1 active:scale-90 transition-transform touch-manipulation">
           <Menu size={18} />
@@ -82,7 +82,7 @@ const TopBar = forwardRef<HTMLElement>(function TopBar(_props, ref) {
         <motion.button
           onClick={() => setCommandPaletteOpen(true)}
           whileTap={{ scale: 0.98 }}
-          className="flex items-center gap-2 sm:gap-2.5 flex-1 max-w-lg h-9 sm:h-11 px-3 sm:px-4 rounded-xl sm:rounded-2xl bg-secondary/50 border border-border/20 hover:border-primary/20 hover:bg-secondary/70 transition-all duration-300 cursor-pointer group touch-manipulation"
+          className="flex items-center gap-2 sm:gap-2.5 flex-1 max-w-xl h-9 sm:h-11 px-3 sm:px-4 rounded-xl sm:rounded-2xl bg-background/55 border border-border/55 hover:border-primary/35 hover:bg-card/80 hover:shadow-[var(--shadow-glow)] transition-all duration-300 cursor-pointer group touch-manipulation"
         >
           <Search size={14} className="text-muted-foreground/40 group-hover:text-primary transition-colors flex-shrink-0 sm:w-4 sm:h-4" />
           <span className="text-xs sm:text-sm text-muted-foreground/40 flex-1 text-left truncate">Search...</span>
@@ -96,7 +96,7 @@ const TopBar = forwardRef<HTMLElement>(function TopBar(_props, ref) {
           <motion.button
             onClick={() => setImportModalOpen(true)}
             whileTap={{ scale: 0.9 }}
-            className="hidden sm:flex items-center justify-center w-9 sm:w-10 h-9 sm:h-10 rounded-xl sm:rounded-2xl text-muted-foreground/40 hover:text-foreground hover:bg-secondary/60 transition-all touch-manipulation"
+            className="hidden sm:flex items-center justify-center w-9 sm:w-10 h-9 sm:h-10 rounded-xl sm:rounded-2xl text-muted-foreground/55 hover:text-foreground hover:bg-secondary/75 hover:shadow-sm transition-all touch-manipulation"
             title="Import"
           >
             <Mail size={16} />
@@ -105,7 +105,7 @@ const TopBar = forwardRef<HTMLElement>(function TopBar(_props, ref) {
           <motion.button
             onClick={handleExport}
             whileTap={{ scale: 0.9 }}
-            className="hidden sm:flex items-center justify-center w-9 sm:w-10 h-9 sm:h-10 rounded-xl sm:rounded-2xl text-muted-foreground/40 hover:text-foreground hover:bg-secondary/60 transition-all touch-manipulation"
+            className="hidden sm:flex items-center justify-center w-9 sm:w-10 h-9 sm:h-10 rounded-xl sm:rounded-2xl text-muted-foreground/55 hover:text-foreground hover:bg-secondary/75 hover:shadow-sm transition-all touch-manipulation"
             title="Export"
           >
             <Download size={16} />
@@ -114,7 +114,7 @@ const TopBar = forwardRef<HTMLElement>(function TopBar(_props, ref) {
           {/* Notifications */}
           <motion.button
             whileTap={{ scale: 0.9 }}
-            className="relative flex items-center justify-center w-9 sm:w-10 h-9 sm:h-10 rounded-xl sm:rounded-2xl text-muted-foreground/40 hover:text-foreground hover:bg-secondary/60 transition-all touch-manipulation"
+            className="relative flex items-center justify-center w-9 sm:w-10 h-9 sm:h-10 rounded-xl sm:rounded-2xl text-muted-foreground/55 hover:text-foreground hover:bg-secondary/75 hover:shadow-sm transition-all touch-manipulation"
           >
             <Bell size={16} className="sm:w-[18px] sm:h-[18px]" />
             {notifCount > 0 && (
