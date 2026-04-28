@@ -14,21 +14,14 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Blank App" },
-      { name: "description", content: "A blank app canvas" },
+      { title: "Mission Control" },
+      { name: "description", content: "Mission Control dashboard" },
     ],
   }),
-  component: RootComponent,
+  shellComponent: RootDocument,
+  component: Outlet,
   notFoundComponent: NotFoundComponent,
 });
-
-function RootComponent() {
-  return (
-    <RootDocument>
-      <Outlet />
-    </RootDocument>
-  );
-}
 
 function NotFoundComponent() {
   return (
