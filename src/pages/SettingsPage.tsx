@@ -725,7 +725,7 @@ export default function SettingsPage() {
                   </p>
                   <div className={`rounded-xl p-3 ${hasCustomKey ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400"} text-sm font-medium flex items-center gap-2`}>
                     {hasCustomKey ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
-                    {hasCustomKey ? "Custom encryption key is set" : "Using default key — set a custom key for better security"}
+                    {hasCustomKey ? "Custom encryption key is set" : "A strong device key was generated automatically. Save a custom key if you need portable vault recovery."}
                   </div>
                   <div className="space-y-3">
                     <label className="text-xs font-semibold text-muted-foreground block">Encryption Key</label>
@@ -826,7 +826,7 @@ export default function SettingsPage() {
                       { label: "Styling", value: "Tailwind CSS + Framer Motion" },
                       { label: "Storage", value: "IndexedDB (Dexie.js) — Offline-first" },
                       { label: "Cloud Sync", value: "Supabase (optional)" },
-                      { label: "Encryption", value: "AES-256 via crypto-js" },
+                      { label: "Encryption", value: "AES-256-GCM via Web Crypto" },
                       { label: "Layout", value: "react-grid-layout — Drag & Drop" },
                     ].map(({ label, value }) => (
                       <div key={label} className="flex items-center justify-between py-2 border-b border-border/30 last:border-0">
