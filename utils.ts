@@ -32,6 +32,7 @@ import {
   BoxStyle
 } from './types';
 import { deduplicateRequest } from './lib/request-dedup';
+import { supabase as _supabaseClient } from './src/integrations/supabase/client';
 
 // ============================================================================
 // CACHE & STORAGE CLASSES
