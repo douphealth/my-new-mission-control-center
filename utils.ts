@@ -2777,12 +2777,20 @@ const callSerpApiProxy = async (params: {
   query?: string;
   asin?: string;
   apiKey: string;
+  tracker?: BudgetTracker;
 }): Promise<any> => {
   if (!params.apiKey?.trim()) {
     throw new SerpApiError('SerpAPI key is required. Add it in Settings.', 0, true);
   }
 
-  let lastError: Error | null = null;
+  // Budget gate — when wired into a scan, refuse the call before we spend it.
+  if (params.tracker && !params.tracker.canSpend()) {
+    throw new SerpApiError(
+      `SerpAPI budget reached (${params.tracker.callsUsed}/${params.tracker.budget})`,
+      0,
+      false,
+    );
+  }
 
   const url = new URL(SERPAPI_BASE_URL);
   url.searchParams.set('api_key', params.apiKey.trim());
@@ -2803,17 +2811,17 @@ const callSerpApiProxy = async (params: {
     url.searchParams.set('num', String(SEARCH_RESULTS_LIMIT));
   }
 
-  // Retry with exponential backoff (max 3 attempts)
-  for (let attempt = 0; attempt < 3; attempt++) {
+  let lastError: Error | null = null;
+  let retriesUsed = 0;
+
+  for (let attempt = 0; attempt < SERPAPI_MAX_ATTEMPTS; attempt++) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
       const response = await fetch(url.toString(), {
         method: 'GET',
-        headers: {
-          Accept: 'application/json',
-        },
+        headers: { Accept: 'application/json' },
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -2828,46 +2836,88 @@ const callSerpApiProxy = async (params: {
       if (!response.ok) {
         const status = response.status;
         const msg = data?.error || `SerpAPI request failed: ${status}`;
+
+        // Fatal — never retry, never count as transient failure for the
+        // budget tracker; the caller will surface the error and stop.
         if (status === 401 || status === 402 || status === 403) {
+          if (params.tracker) {
+            params.tracker.recordCall(retriesUsed);
+            params.tracker.recordFailure();
+          }
           throw new SerpApiError(msg, status, true);
         }
 
+        // Rate limit — exponential backoff with jitter, then retry.
         if (status === 429) {
-          const waitMs = Math.pow(2, attempt) * 2000;
-          await new Promise(r => setTimeout(r, waitMs));
+          retriesUsed += 1;
+          const waitMs = Math.min(
+            SERPAPI_BACKOFF_MAX_MS,
+            SERPAPI_BACKOFF_BASE_MS * Math.pow(2, attempt) + Math.random() * 250,
+          );
+          if (params.tracker) {
+            params.tracker.emit(
+              'serpapi_rate_limit',
+              `Rate limited — backing off ${Math.round(waitMs)}ms (attempt ${attempt + 1}/${SERPAPI_MAX_ATTEMPTS})`,
+            );
+          }
+          await new Promise((r) => setTimeout(r, waitMs));
           continue;
         }
 
         lastError = new SerpApiError(msg, status, false);
-        continue;
-      }
-
-      if (data && typeof data === 'object' && data.error) {
+      } else if (data && typeof data === 'object' && data.error) {
         const message = String(data.error);
         const status = Number(data.search_metadata?.status_code || 500);
         if (status === 401 || status === 402 || status === 403) {
+          if (params.tracker) {
+            params.tracker.recordCall(retriesUsed);
+            params.tracker.recordFailure();
+          }
           throw new SerpApiError(message, status, true);
         }
         lastError = new SerpApiError(message, status || 500, false);
-        continue;
+      } else {
+        if (params.tracker) {
+          params.tracker.recordCall(retriesUsed);
+          params.tracker.recordSuccess();
+        }
+        return data;
       }
-
-      return data;
     } catch (e: any) {
       if (e?.name === 'AbortError') {
-        lastError = new SerpApiError('SerpAPI request timed out. Please try again.', 504, false);
-        continue;
+        lastError = new SerpApiError(
+          'SerpAPI request timed out. Please try again.',
+          504,
+          false,
+        );
+      } else if (e instanceof SerpApiError && e.isFatal) {
+        throw e;
+      } else {
+        lastError = e;
       }
-      if (e instanceof SerpApiError && e.isFatal) throw e;
-      lastError = e;
     }
 
-    // Exponential backoff between attempts
-    if (attempt < 2) {
-      await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));
+    // Exponential backoff with jitter before next attempt
+    if (attempt < SERPAPI_MAX_ATTEMPTS - 1) {
+      retriesUsed += 1;
+      const waitMs = Math.min(
+        SERPAPI_BACKOFF_MAX_MS,
+        SERPAPI_BACKOFF_BASE_MS * Math.pow(2, attempt) + Math.random() * 200,
+      );
+      if (params.tracker) {
+        params.tracker.emit(
+          'serpapi_retry',
+          `Transient error — retrying in ${Math.round(waitMs)}ms (attempt ${attempt + 1}/${SERPAPI_MAX_ATTEMPTS})`,
+        );
+      }
+      await new Promise((r) => setTimeout(r, waitMs));
     }
   }
 
+  if (params.tracker) {
+    params.tracker.recordCall(retriesUsed);
+    params.tracker.recordFailure();
+  }
   throw lastError || new SerpApiError('SerpAPI proxy failed after retries', 500, false);
 };
 
