@@ -1,11 +1,8 @@
-import { createFileRoute, Link, redirect } from '@tanstack/react-router';
-import { supabase } from '../integrations/supabase/client';
+import { createFileRoute, Link, useRouter } from '@tanstack/react-router';
+import { useEffect } from 'react';
+import { useAuth } from '../lib/auth';
 
 export const Route = createFileRoute('/')({
-  beforeLoad: async () => {
-    const { data } = await supabase.auth.getSession();
-    if (data.session) throw redirect({ to: '/dashboard' });
-  },
   head: () => ({
     meta: [
       { title: 'AmzWP Automator — Amazon affiliate WordPress automation' },
@@ -20,6 +17,23 @@ export const Route = createFileRoute('/')({
 });
 
 function Landing() {
+  const { session, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && session) {
+      router.navigate({ to: '/dashboard' });
+    }
+  }, [loading, router, session]);
+
+  if (loading) {
+    return (
+      <div className="min-h-dvh bg-dark-950 flex items-center justify-center text-gray-400">
+        Loading…
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-dvh bg-dark-950 text-white">
       <header className="border-b border-dark-800">
