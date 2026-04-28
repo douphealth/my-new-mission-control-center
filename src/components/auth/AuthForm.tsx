@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
-import { useAuth } from '@/lib/auth';
+import { useAuth } from '../../lib/auth';
 
 interface Props {
   mode: 'signin' | 'signup';

@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '../integrations/supabase/client';
 
 interface AuthState {
   user: User | null;
