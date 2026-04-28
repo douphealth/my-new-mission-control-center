@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import tsConfigPaths from 'vite-tsconfig-paths';
 import tailwindcss from '@tailwindcss/vite';
@@ -6,6 +7,7 @@ import { componentTagger } from 'lovable-tagger';
 
 export default defineConfig(({ mode }) => ({
   plugins: [
+    react(),
     tsConfigPaths({ projects: ['./tsconfig.json'] }),
     tailwindcss(),
     tanstackStart({}),
