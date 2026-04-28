@@ -32,7 +32,6 @@ import {
   BoxStyle
 } from './types';
 import { deduplicateRequest } from './lib/request-dedup';
-import { supabase as _supabaseClient } from './src/integrations/supabase/client';
 
 // ============================================================================
 // CACHE & STORAGE CLASSES
@@ -322,6 +321,15 @@ const CACHE_TTL_SHORT_MS = 60 * 60 * 1000; // 1 hour for volatile data
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 1000;
 const MAX_CONCURRENT_REQUESTS = 10;
+const SERPAPI_BASE_URL = 'https://serpapi.com/search.json';
+const MIN_PRODUCTS_PER_ARTICLE = 1;
+const MAX_PRODUCTS_PER_ARTICLE = 4;
+const MIN_WORDS_PER_PRODUCT = 900;
+const MAX_PHASE1_LOOKUPS = 6;
+const MAX_AI_QUEUE_LOOKUPS = 4;
+const SEARCH_RESULTS_LIMIT = 3;
+const SEARCH_QUERY_MIN_WORDS = 2;
+const SEARCH_QUERY_MAX_WORDS = 5;
 const SITEMAP_FETCH_TIMEOUT_MS = 20000;
 const PAGE_FETCH_TIMEOUT_MS = 15000;
 const API_TIMEOUT_MS = 30000;
@@ -2530,9 +2538,6 @@ class SerpApiError extends Error {
   }
 }
 
-// Uses the project's configured Supabase client (imported at top) — single source of truth
-// for URL + auth, guaranteeing we hit the project where serpapi-proxy is deployed.
-
 const callSerpApiProxy = async (params: {
   type: 'search' | 'product';
   query?: string;
@@ -2545,29 +2550,50 @@ const callSerpApiProxy = async (params: {
 
   let lastError: Error | null = null;
 
+  const url = new URL(SERPAPI_BASE_URL);
+  url.searchParams.set('api_key', params.apiKey.trim());
+  url.searchParams.set('amazon_domain', 'amazon.com');
+
+  if (params.type === 'product') {
+    if (!params.asin?.trim()) {
+      throw new SerpApiError('ASIN is required for product lookup.', 0, true);
+    }
+    url.searchParams.set('engine', 'amazon_product');
+    url.searchParams.set('asin', params.asin.trim());
+  } else {
+    if (!params.query?.trim()) {
+      throw new SerpApiError('Search query is required for Amazon lookup.', 0, true);
+    }
+    url.searchParams.set('engine', 'amazon');
+    url.searchParams.set('k', params.query.trim());
+    url.searchParams.set('num', String(SEARCH_RESULTS_LIMIT));
+  }
+
   // Retry with exponential backoff (max 3 attempts)
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const { data, error } = await _supabaseClient.functions.invoke('serpapi-proxy', {
-        body: params,
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+        },
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
-      if (!error) {
-        // Edge function may return { error: "..." } in body for SerpAPI-side failures
-        if (data && typeof data === 'object' && 'error' in data && data.error) {
-          const status = (data as any).status || 500;
-          if (status === 401 || status === 402 || status === 403) {
-            throw new SerpApiError(String(data.error), status, true);
-          }
-          lastError = new SerpApiError(String(data.error), status, false);
-        } else {
-          return data;
-        }
-      } else {
-        // FunctionsHttpError exposes context.response with the status
-        const status = (error as any)?.context?.response?.status ?? 500;
-        const msg = error.message || `SerpAPI proxy error: ${status}`;
+      let data: any = null;
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
+      }
 
+      if (!response.ok) {
+        const status = response.status;
+        const msg = data?.error || `SerpAPI request failed: ${status}`;
         if (status === 401 || status === 402 || status === 403) {
           throw new SerpApiError(msg, status, true);
         }
@@ -2579,8 +2605,25 @@ const callSerpApiProxy = async (params: {
         }
 
         lastError = new SerpApiError(msg, status, false);
+        continue;
       }
+
+      if (data && typeof data === 'object' && data.error) {
+        const message = String(data.error);
+        const status = Number(data.search_metadata?.status_code || 500);
+        if (status === 401 || status === 402 || status === 403) {
+          throw new SerpApiError(message, status, true);
+        }
+        lastError = new SerpApiError(message, status || 500, false);
+        continue;
+      }
+
+      return data;
     } catch (e: any) {
+      if (e?.name === 'AbortError') {
+        lastError = new SerpApiError('SerpAPI request timed out. Please try again.', 504, false);
+        continue;
+      }
       if (e instanceof SerpApiError && e.isFatal) throw e;
       lastError = e;
     }
