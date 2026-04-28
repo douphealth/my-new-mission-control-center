@@ -19,7 +19,11 @@ function DashboardHome() {
         supabase.from('sites').select('id', { count: 'exact', head: true }),
         supabase.from('generated_blog_posts').select('id', { count: 'exact', head: true }),
       ]);
-      setStats({ sites: sites.count ?? 0, posts: posts.count ?? 0 });
+
+      setStats({
+        sites: sites.error ? 0 : sites.count ?? 0,
+        posts: posts.error ? 0 : posts.count ?? 0,
+      });
       setLoading(false);
     })();
   }, []);
