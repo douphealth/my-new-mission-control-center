@@ -6,7 +6,7 @@ import { onSaveStatus } from '@/stores/dataStore';
 export default function StatusBar() {
   const [online, setOnline] = useState(navigator.onLine);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [cloudHealthy, setCloudHealthy] = useState<boolean | null>(null);
+  const [cloudState, setCloudState] = useState<'offline' | 'not-configured' | 'ready' | 'schema-missing' | 'error'>('not-configured');
 
   useEffect(() => {
     const on = () => setOnline(true);
@@ -20,16 +20,20 @@ export default function StatusBar() {
     let cancelled = false;
     const check = async () => {
       if (!navigator.onLine) {
-        if (!cancelled) setCloudHealthy(false);
+        if (!cancelled) setCloudState('offline');
         return;
       }
       const config = getSupabaseConfig();
       if (!config) {
-        if (!cancelled) setCloudHealthy(false);
+        if (!cancelled) setCloudState('not-configured');
         return;
       }
       const result = await testSupabaseConnection(config.url, config.anonKey);
-      if (!cancelled) setCloudHealthy(result.ok);
+      if (!cancelled) {
+        setCloudState(
+          result.ok ? 'ready' : result.connectionOk ? 'schema-missing' : 'error'
+        );
+      }
     };
     void check();
     const interval = window.setInterval(check, 120000);
@@ -71,8 +75,14 @@ export default function StatusBar() {
           <Database size={10} /> IndexedDB
         </span>
         {supabaseConnected && (
-          <span className={`flex items-center gap-1 ${cloudHealthy === false ? 'text-destructive/70' : 'text-success/70'}`}>
-            <Cloud size={10} /> Supabase · {getSupabaseProjectHost()}
+          <span className={`flex items-center gap-1 ${
+            cloudState === 'ready'
+              ? 'text-success/70'
+              : cloudState === 'schema-missing' || cloudState === 'error'
+                ? 'text-destructive/70'
+                : 'text-muted-foreground/60'
+          }`}>
+            <Cloud size={10} /> Supabase · {getSupabaseProjectHost()} {cloudState === 'ready' ? 'ready' : cloudState === 'schema-missing' ? 'schema missing' : cloudState === 'error' ? 'error' : ''}
           </span>
         )}
         {saveStatus === 'saving' && (
