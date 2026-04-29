@@ -2275,7 +2275,13 @@ export const analyzeContentAndFindProduct = async (
     }
 
     if (quickProducts.length === 0 && serpErrorCount >= Math.min(maxPhase1, 3) && lastSerpError) {
-      throw new Error(`SerpAPI failed for all products: ${lastSerpError}`);
+      tracker.emit('serpapi_lookup_unavailable', `Amazon verification unavailable: ${lastSerpError}`);
+      return {
+        detectedProducts: [],
+        contentType: 'informational',
+        monetizationPotential: 'low',
+        scanReport: tracker.finalize(),
+      };
     }
 
     if (quickProducts.length > 0) {
@@ -2472,7 +2478,15 @@ export const analyzeContentAndFindProduct = async (
     }
 
     if (refinedProducts.length === 0 && serpBatchError && validatedProducts.size > 0) {
-      throw new Error(`Found ${validatedProducts.size} products in content but SerpAPI failed: ${serpBatchError}`);
+      tracker.emit('serpapi_lookup_unavailable', `Amazon verification unavailable: ${serpBatchError}`);
+      return {
+        detectedProducts: [],
+        comparison: undefined,
+        contentType: parsed.contentType || 'informational',
+        monetizationPotential: 'low',
+        keywords: parsed.suggestedKeywords || [],
+        scanReport: tracker.finalize(),
+      };
     }
 
     let comparison: ComparisonData | undefined;
@@ -2576,15 +2590,27 @@ export const analyzeContentAndFindProduct = async (
       }
 
       if (fallbackSerpError) {
-        throw new Error(`SerpAPI Error: ${fallbackSerpError}`);
+        tracker.emit('serpapi_lookup_unavailable', `Amazon verification unavailable: ${fallbackSerpError}`);
+        return {
+          detectedProducts: [],
+          contentType: 'informational',
+          monetizationPotential: 'low',
+          scanReport: tracker.finalize(),
+        };
       }
     }
 
     const phase1Count = phase1Products.length;
-    const detail = phase1Count > 0
-      ? `Detected ${phase1Count} products in content but Amazon lookup failed.`
-      : error.message;
-    throw new Error(`Scan failed: ${detail}`);
+    if (phase1Count > 0) {
+      tracker.emit('scan_completed_without_verification', `Detected ${phase1Count} candidate products, but Amazon verification is currently unavailable.`);
+      return {
+        detectedProducts: [],
+        contentType: 'informational',
+        monetizationPotential: 'low',
+        scanReport: tracker.finalize(),
+      };
+    }
+    throw new Error(`Scan failed: ${error.message}`);
   }
 };
 
