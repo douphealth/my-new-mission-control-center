@@ -2701,6 +2701,32 @@ function getInvalidSearchQueryDetail(query: string): string {
   return 'query too short for Amazon search';
 }
 
+function articleLooksInformational(title: string, content: string): boolean {
+  const combined = normalizeCandidateText(`${title} ${stripHtml(content)}`);
+  if (!combined) return true;
+
+  const highIntentSignals = [
+    'best ',
+    'top ',
+    'review',
+    'reviews',
+    'vs ',
+    ' versus ',
+    'compare',
+    'comparison',
+    'buy ',
+    'buying guide',
+    'our picks',
+    'recommended',
+  ];
+
+  if (highIntentSignals.some((signal) => combined.includes(signal))) {
+    return false;
+  }
+
+  return !hasConcreteProductSignals(combined);
+}
+
 function extractProductsPhase1(htmlContent: string, textContent: string): Phase1Product[] {
   const products: Phase1Product[] = [];
   const seen = new Set<string>();
