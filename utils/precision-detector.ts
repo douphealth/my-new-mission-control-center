@@ -367,7 +367,7 @@ function extractBrandModelCandidates(
       let match;
       while ((match = pattern.exec(text)) !== null) {
         const name = match[1]?.trim();
-        if (!name || name.length < 4) continue;
+        if (!name || name.length < 4 || !isSpecificProductName(name)) continue;
         
         const key = fuzzyKey(name);
         if (seen.has(key)) {
@@ -493,7 +493,7 @@ function extractBrandModelCandidates(
         .replace(/\s*[-–—]\s*(?:Best|Review|Comparison|Guide|Honest|Complete|Full|In-Depth).*$/i, '')
         .trim();
       
-      if (headerText.length >= 5 && headerText.length <= 100) {
+      if (headerText.length >= 5 && headerText.length <= 100 && isSpecificProductName(headerText)) {
         const hasProductSignal =
           /[A-Z][a-z]+\s+[A-Z0-9]/.test(headerText) ||
           /\d/.test(headerText) ||
@@ -532,7 +532,7 @@ function extractBrandModelCandidates(
       const boldText = boldMatch[1]?.trim()
         .replace(/&amp;/g, '&')
         .replace(/&#\d+;/g, '');
-      if (!boldText || boldText.length < 5) continue;
+      if (!boldText || boldText.length < 5 || !isSpecificProductName(boldText)) continue;
       
       const hasProductSignal =
         /[A-Z][a-z]+\s+[A-Z0-9]/.test(boldText) ||
@@ -865,6 +865,51 @@ function buildOptimalSearchQuery(candidate: DetectedCandidate): string {
   return words.slice(0, 7).join(' ');
 }
 
+const GENERIC_FAMILY_ONLY_NAMES = new Set([
+  'echo',
+  'kindle',
+  'ring',
+  'blink',
+  'fire',
+  'fire tv',
+  'fire stick',
+  'fire tablet',
+]);
+
+const PRODUCT_MODEL_HINT_PATTERN = /\b(?:dot|show|studio|pop|paperwhite|scribe|oasis|doorbell|camera|alarm|floodlight|spotlight|pro|max|plus|ultra|mini|lite|se|gen|series|watch|buds|band|tracker|phone|tablet|speaker|headphones|earbuds|forerunner|fenix|venu|instinct|vivoactive|quest|roomba|pixel|galaxy|iphone|ipad|macbook|surface|fitbit|garmin|theragun|beam|arc|move|roam|rambler|tundra|quencher)\b/i;
+const EDITORIAL_CANDIDATE_PATTERN = /^(?:why|how|what|when|where|which|who|understanding|key|summary|conclusion|overview|guide|tips|reasons|benefits|risks|advice)\b|\b(?:takeaways|breakdown|explains|concluded|needs of|for 20\d{2}|safety data|injury rates|coaching quality)\b/i;
+
+function normalizeCandidateName(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/&amp;/g, '&')
+    .replace(/&#\d+;/g, ' ')
+    .replace(/[^\w\s&-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isEditorialCandidateName(value: string): boolean {
+  const normalized = normalizeCandidateName(value);
+  return !normalized || EDITORIAL_CANDIDATE_PATTERN.test(normalized);
+}
+
+function isSpecificProductName(value: string): boolean {
+  const normalized = normalizeCandidateName(value);
+  if (!normalized || isEditorialCandidateName(normalized)) return false;
+  if (GENERIC_FAMILY_ONLY_NAMES.has(normalized)) return false;
+  if (/\d/.test(normalized) || PRODUCT_MODEL_HINT_PATTERN.test(normalized)) return true;
+
+  const brand = detectBrandFromName(normalized);
+  if (!brand) return false;
+
+  const words = normalized.split(/\s+/).filter(Boolean);
+  if (words.length < 2) return false;
+  if (BRAND_ALIAS_MAP.has(normalized)) return false;
+
+  return true;
+}
+
 // ============================================================================
 // LAYER 6: AMAZON VERIFICATION
 // ============================================================================
@@ -891,6 +936,7 @@ async function verifyWithAmazon(
   const validCandidates = candidates.filter(c => {
     const q = c.searchQuery?.trim();
     if (!q || q.length < 3) return false;
+    if (!c.asin && !isSpecificProductName(q)) return false;
     
     // Must have at least one detection source that isn't just AI
     const hasStructuralSource = c.sources.some(s => 
@@ -1094,7 +1140,7 @@ export async function detectProductsPrecision(
       
       // Convert AI candidates to DetectedCandidate format
       const aiDetected: DetectedCandidate[] = aiCandidates
-        .filter(ai => ai.confidence >= 50)
+        .filter(ai => ai.confidence >= 50 && isSpecificProductName(ai.searchQuery || ai.name))
         .map(ai => ({
           canonicalName: ai.name,
           nameVariants: [ai.name],
