@@ -2195,7 +2195,7 @@ export const analyzeContentAndFindProduct = async (
 
         if (!productData.asin) {
           if (!shouldUseSearchQuery(p1.name)) {
-            tracker.skip(p1.name, 'invalid_query', 'query too short for Amazon search', p1.confidence);
+            tracker.skip(p1.name, 'invalid_query', getInvalidSearchQueryDetail(p1.name), p1.confidence);
             continue;
           }
           if (!tracker.canSpend()) {
@@ -2610,6 +2610,15 @@ export const analyzeContentAndFindProduct = async (
         scanReport: tracker.finalize(),
       };
     }
+    if (articleLooksInformational(title, content)) {
+      return {
+        detectedProducts: [],
+        contentType: 'informational',
+        monetizationPotential: 'low',
+        scanReport: tracker.finalize(),
+      };
+    }
+
     throw new Error(`Scan failed: ${error.message}`);
   }
 };
