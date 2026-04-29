@@ -2275,7 +2275,13 @@ export const analyzeContentAndFindProduct = async (
     }
 
     if (quickProducts.length === 0 && serpErrorCount >= Math.min(maxPhase1, 3) && lastSerpError) {
-      throw new Error(`SerpAPI failed for all products: ${lastSerpError}`);
+      tracker.emit('serpapi_lookup_unavailable', `Amazon verification unavailable: ${lastSerpError}`);
+      return {
+        detectedProducts: [],
+        contentType: 'informational',
+        monetizationPotential: 'low',
+        scanReport: tracker.finalize(),
+      };
     }
 
     if (quickProducts.length > 0) {
@@ -2472,7 +2478,15 @@ export const analyzeContentAndFindProduct = async (
     }
 
     if (refinedProducts.length === 0 && serpBatchError && validatedProducts.size > 0) {
-      throw new Error(`Found ${validatedProducts.size} products in content but SerpAPI failed: ${serpBatchError}`);
+      tracker.emit('serpapi_lookup_unavailable', `Amazon verification unavailable: ${serpBatchError}`);
+      return {
+        detectedProducts: [],
+        comparison: undefined,
+        contentType: parsed.contentType || 'informational',
+        monetizationPotential: 'low',
+        keywords: parsed.suggestedKeywords || [],
+        scanReport: tracker.finalize(),
+      };
     }
 
     let comparison: ComparisonData | undefined;
@@ -2576,15 +2590,27 @@ export const analyzeContentAndFindProduct = async (
       }
 
       if (fallbackSerpError) {
-        throw new Error(`SerpAPI Error: ${fallbackSerpError}`);
+        tracker.emit('serpapi_lookup_unavailable', `Amazon verification unavailable: ${fallbackSerpError}`);
+        return {
+          detectedProducts: [],
+          contentType: 'informational',
+          monetizationPotential: 'low',
+          scanReport: tracker.finalize(),
+        };
       }
     }
 
     const phase1Count = phase1Products.length;
-    const detail = phase1Count > 0
-      ? `Detected ${phase1Count} products in content but Amazon lookup failed.`
-      : error.message;
-    throw new Error(`Scan failed: ${detail}`);
+    if (phase1Count > 0) {
+      tracker.emit('scan_completed_without_verification', `Detected ${phase1Count} candidate products, but Amazon verification is currently unavailable.`);
+      return {
+        detectedProducts: [],
+        contentType: 'informational',
+        monetizationPotential: 'low',
+        scanReport: tracker.finalize(),
+      };
+    }
+    throw new Error(`Scan failed: ${error.message}`);
   }
 };
 
@@ -2889,56 +2915,6 @@ class SerpApiError extends Error {
   }
 }
 
-const executeDirectSerpApiRequest = async (params: {
-  type: 'search' | 'product';
-  query?: string;
-  asin?: string;
-  apiKey: string;
-}): Promise<any> => {
-  const url = new URL('https://serpapi.com/search.json');
-  url.searchParams.set('api_key', params.apiKey.trim());
-  url.searchParams.set('amazon_domain', 'amazon.com');
-
-  if (params.type === 'product') {
-    url.searchParams.set('engine', 'amazon_product');
-    url.searchParams.set('asin', params.asin!.trim());
-  } else {
-    url.searchParams.set('engine', 'amazon');
-    url.searchParams.set('k', params.query!.trim());
-    url.searchParams.set('num', String(SEARCH_RESULTS_LIMIT));
-  }
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-      signal: controller.signal,
-    });
-
-    let data: any = null;
-    try {
-      data = await response.json();
-    } catch {
-      data = null;
-    }
-
-    if (!response.ok) {
-      throw new SerpApiError(
-        data?.error || `SerpAPI request failed: ${response.status}`,
-        response.status,
-        response.status === 401 || response.status === 402 || response.status === 403,
-      );
-    }
-
-    return data;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-};
-
 const callSerpApiProxy = async (params: {
   type: 'search' | 'product';
   query?: string;
@@ -3005,31 +2981,26 @@ const callSerpApiProxy = async (params: {
           msg = 'Failed to send a request to the Edge Function.';
         }
 
-        const shouldFallbackToDirectSerpApi =
+        const proxyUnavailable =
           status === 404 ||
           error.name === 'FunctionsFetchError' ||
           error.name === 'FunctionsRelayError' ||
           /Requested function was not found/i.test(msg) ||
           /Edge Function/i.test(msg);
 
-        if (shouldFallbackToDirectSerpApi) {
+        if (proxyUnavailable) {
+          lastError = new SerpApiError(
+            'SerpAPI proxy is currently unavailable. Amazon verification has been paused for this scan.',
+            503,
+            false,
+          );
           if (params.tracker) {
             params.tracker.emit(
-              'serpapi_proxy_fallback',
-              'Supabase SerpAPI proxy unavailable — falling back to direct lookup for this scan.',
+              'serpapi_proxy_unavailable',
+              'SerpAPI proxy unavailable — skipping Amazon verification for this scan.',
             );
           }
-          const fallbackData = await executeDirectSerpApiRequest({
-            type: params.type,
-            query: trimmedQuery,
-            asin: trimmedAsin,
-            apiKey: params.apiKey,
-          });
-          if (params.tracker) {
-            params.tracker.recordCall(retriesUsed);
-            params.tracker.recordSuccess();
-          }
-          return fallbackData;
+          break;
         }
 
         // Fatal — never retry, never count as transient failure for the
