@@ -2634,18 +2634,6 @@ const NON_PRODUCT_EXACT_PHRASES = new Set([
   'top reasons people quit crossfit',
 ]);
 
-function decodeHtmlEntities(value: string): string {
-  return value
-    .replace(/&amp;|&#0*38;/gi, '&')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&ndash;|&#8211;/gi, '-')
-    .replace(/&mdash;|&#8212;/gi, '-')
-    .replace(/&rsquo;|&#8217;/gi, "'")
-    .replace(/&quot;|&#8220;|&#8221;/gi, '"')
-    .replace(/&#\d+;/g, ' ')
-    .replace(/&[a-z]+;/gi, ' ');
-}
-
 function normalizeCandidateText(value: string): string {
   return decodeHtmlEntities(value)
     .toLowerCase()
