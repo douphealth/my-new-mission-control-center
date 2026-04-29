@@ -367,7 +367,7 @@ function extractBrandModelCandidates(
       let match;
       while ((match = pattern.exec(text)) !== null) {
         const name = match[1]?.trim();
-        if (!name || name.length < 4) continue;
+        if (!name || name.length < 4 || !isSpecificProductName(name)) continue;
         
         const key = fuzzyKey(name);
         if (seen.has(key)) {
@@ -493,7 +493,7 @@ function extractBrandModelCandidates(
         .replace(/\s*[-–—]\s*(?:Best|Review|Comparison|Guide|Honest|Complete|Full|In-Depth).*$/i, '')
         .trim();
       
-      if (headerText.length >= 5 && headerText.length <= 100) {
+      if (headerText.length >= 5 && headerText.length <= 100 && isSpecificProductName(headerText)) {
         const hasProductSignal =
           /[A-Z][a-z]+\s+[A-Z0-9]/.test(headerText) ||
           /\d/.test(headerText) ||
@@ -532,7 +532,7 @@ function extractBrandModelCandidates(
       const boldText = boldMatch[1]?.trim()
         .replace(/&amp;/g, '&')
         .replace(/&#\d+;/g, '');
-      if (!boldText || boldText.length < 5) continue;
+      if (!boldText || boldText.length < 5 || !isSpecificProductName(boldText)) continue;
       
       const hasProductSignal =
         /[A-Z][a-z]+\s+[A-Z0-9]/.test(boldText) ||
