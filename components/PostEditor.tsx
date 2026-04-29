@@ -632,6 +632,7 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
       let comparison: ComparisonData | undefined;
       let candidateCount = 0;
       let verificationUnavailable = false;
+      let likelyInformationalArticle = false;
 
       if (precisionResult && precisionResult.products.length > 0) {
         products = precisionResult.products;
@@ -658,7 +659,7 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
         });
         products = legacy.detectedProducts;
         comparison = legacy.comparison;
-        candidateCount = products.length;
+        candidateCount = legacy.scanReport?.candidatesEvaluated ?? products.length;
         setScanReport(
           legacy.scanReport
             ? {
@@ -680,6 +681,13 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
           !!legacy.scanReport?.skipped.some((item) =>
             ['serpapi_proxy_unavailable', 'serpapi_lookup_unavailable'].includes(item.reason),
           );
+        likelyInformationalArticle =
+          !verificationUnavailable &&
+          products.length === 0 &&
+          ((legacy.scanReport?.candidatesEvaluated ?? 0) === 0 ||
+            !!legacy.scanReport?.skipped.every((item) =>
+              item.reason === 'invalid_query' || item.detail?.includes('editorial heading'),
+            ));
       }
 
       // 3. Merge results into product map
@@ -700,6 +708,10 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
         else if (verificationUnavailable) {
           toast('Amazon verification is temporarily unavailable. The scan completed, but no products could be verified right now.', {
             duration: 7000,
+          });
+        } else if (likelyInformationalArticle) {
+          toast('This article reads as informational, not product-led, so the scanner skipped weak Amazon matches.', {
+            duration: 6000,
           });
         } else {
           toast('No Amazon-verifiable products found. Try adding manually via ASIN.', { duration: 5000 });

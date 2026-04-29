@@ -2195,7 +2195,7 @@ export const analyzeContentAndFindProduct = async (
 
         if (!productData.asin) {
           if (!shouldUseSearchQuery(p1.name)) {
-            tracker.skip(p1.name, 'invalid_query', 'query too short for Amazon search', p1.confidence);
+            tracker.skip(p1.name, 'invalid_query', getInvalidSearchQueryDetail(p1.name), p1.confidence);
             continue;
           }
           if (!tracker.canSpend()) {
@@ -2610,6 +2610,15 @@ export const analyzeContentAndFindProduct = async (
         scanReport: tracker.finalize(),
       };
     }
+    if (articleLooksInformational(title, content)) {
+      return {
+        detectedProducts: [],
+        contentType: 'informational',
+        monetizationPotential: 'low',
+        scanReport: tracker.finalize(),
+      };
+    }
+
     throw new Error(`Scan failed: ${error.message}`);
   }
 };
@@ -2621,13 +2630,131 @@ interface Phase1Product {
   confidence: number;
 }
 
+const CONCRETE_PRODUCT_HINT_PATTERN = /\b(?:pro|max|plus|ultra|mini|lite|se|gen|series|watch|buds|band|tracker|ring|earbuds|headphones|speaker|studio|solo|charge|sense|versa|forerunner|fenix|venu|instinct|paperwhite|scribe|quest|kindle|echo|roomba|airpods|iphone|ipad|macbook|pixel|galaxy|surface|fitbit|garmin|theragun|quietcomfort|soundlink|beam|arc|move|roam)\b/i;
+const KNOWN_PRODUCT_BRAND_PATTERN = /\b(?:apple|samsung|sony|google|microsoft|amazon|bose|jbl|beats|garmin|fitbit|oura|whoop|dyson|shark|ninja|vitamix|breville|instant\s*pot|kindle|echo|roomba|irobot|eufy|roborock|gopro|dji|anker|theragun|sonos|yeti|stanley|hydro\s*flask|logitech|razer|corsair|asus|acer|dell|hp|lenovo|nintendo|xbox|playstation|meta|quest|pixel)\b/i;
+const NON_PRODUCT_EXACT_PHRASES = new Set([
+  'key takeaways',
+  'what the data actually concluded',
+  'what the latest data really explains',
+  'why do people quit crossfit',
+  'coaching quality determines longevity',
+  'overuse and under recovery',
+  'the formula that breaks bodies',
+  'top reasons people quit crossfit',
+]);
+
+function normalizeCandidateText(value: string): string {
+  return decodeHtmlEntities(value)
+    .toLowerCase()
+    .replace(/[^\w\s&-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function hasConcreteProductSignals(value: string): boolean {
+  const normalized = normalizeCandidateText(value);
+  if (!normalized) return false;
+
+  if (/\b[a-z]{2,}\s+[a-z]*\d[a-z0-9-]*\b/i.test(normalized)) {
+    return true;
+  }
+
+  if (CONCRETE_PRODUCT_HINT_PATTERN.test(normalized)) {
+    return true;
+  }
+
+  if (KNOWN_PRODUCT_BRAND_PATTERN.test(normalized) && /\d/.test(normalized)) {
+    return true;
+  }
+
+  if (/\b(?:airpods|apple\s*watch|galaxy\s*buds|pixel\s*buds|oura\s*ring|echo\s*dot|fire\s*tv|steam\s*deck|kindle)\b/i.test(normalized)) {
+    return true;
+  }
+
+  return false;
+}
+
+function looksLikeEditorialPhrase(value: string): boolean {
+  const normalized = normalizeCandidateText(value);
+  if (!normalized) return true;
+
+  if (NON_PRODUCT_EXACT_PHRASES.has(normalized)) {
+    return true;
+  }
+
+  if (/^(?:why|what|how|when|where|which|who|is|are|can|should|do|does|did|watch)\b/.test(normalized) && !hasConcreteProductSignals(normalized)) {
+    return true;
+  }
+
+  if (/\b(?:takeaways|breakdown|explains|concluded|reasons|safety|risks|advice|guide|benefits|injury|studies|research|longevity|coaching|screening|onboarding|intensity|recovery|under fire|ego lifting|beats speed|coaching gaps)\b/.test(normalized) && !hasConcreteProductSignals(normalized)) {
+    return true;
+  }
+
+  if (normalized.split(' ').length > 6 && !hasConcreteProductSignals(normalized)) {
+    return true;
+  }
+
+  return false;
+}
+
+function getInvalidSearchQueryDetail(query: string): string {
+  const optimized = optimizeSearchQuery(query);
+  if (!optimized) {
+    return 'query too short for Amazon search';
+  }
+
+  if (looksLikeEditorialPhrase(optimized)) {
+    return 'query is an editorial heading, not a concrete product';
+  }
+
+  return 'query too short for Amazon search';
+}
+
+function articleLooksInformational(title: string, content: string): boolean {
+  const combined = normalizeCandidateText(`${title} ${stripHtml(content)}`);
+  if (!combined) return true;
+
+  const highIntentSignals = [
+    'best ',
+    'top ',
+    'review',
+    'reviews',
+    'vs ',
+    ' versus ',
+    'compare',
+    'comparison',
+    'buy ',
+    'buying guide',
+    'our picks',
+    'recommended',
+  ];
+
+  if (highIntentSignals.some((signal) => combined.includes(signal))) {
+    return false;
+  }
+
+  return !hasConcreteProductSignals(combined);
+}
+
 function extractProductsPhase1(htmlContent: string, textContent: string): Phase1Product[] {
   const products: Phase1Product[] = [];
   const seen = new Set<string>();
 
   const addProduct = (name: string, sourceType: string, confidence: number, asin?: string) => {
-    const cleaned = name.trim().replace(/[\.\,\!\?\;]+$/, '');
+    const cleaned = decodeHtmlEntities(name).trim().replace(/[\.\,\!\?\;]+$/, '');
     if (!cleaned || cleaned.length < 4) return;
+
+    if (!asin) {
+      if (looksLikeEditorialPhrase(cleaned)) return;
+
+      if (
+        ['header', 'bold_mention', 'numbered_list', 'brand_model', 'affiliate_link'].includes(sourceType) &&
+        !hasConcreteProductSignals(cleaned)
+      ) {
+        return;
+      }
+    }
+
     const key = asin || cleaned.toLowerCase().replace(/\s+/g, '_');
     if (seen.has(key)) return;
     seen.add(key);
