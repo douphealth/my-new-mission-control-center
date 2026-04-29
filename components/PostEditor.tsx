@@ -689,9 +689,21 @@ export const PostEditor: React.FC<PostEditorProps> = ({ post, config, onBack }) 
         toast(`Precision Scan: ${label}`, { style: { background: '#0ea5e9' }, duration: 4000 });
       } else {
         const contentLen = currentHtml.replace(/<[^>]+>/g, '').trim().length;
+        const latestStage = (scanProgress?.stage || scanReport?.skipped?.[0]?.reason || '').toLowerCase();
+        const verificationUnavailable =
+          latestStage.includes('serpapi_proxy_unavailable') ||
+          latestStage.includes('serpapi_lookup_unavailable') ||
+          latestStage.includes('scan_completed_without_verification');
+
         if (contentLen < 200) toast('Content too short for product detection.', { duration: 5000 });
         else if (!config.serpApiKey) toast('SerpAPI key required. Add it in Settings > Amazon.', { duration: 5000 });
-        else toast('No Amazon-verifiable products found. Try adding manually via ASIN.', { duration: 5000 });
+        else if (verificationUnavailable) {
+          toast('Amazon verification is temporarily unavailable. The scan completed, but no products could be verified right now.', {
+            duration: 7000,
+          });
+        } else {
+          toast('No Amazon-verifiable products found. Try adding manually via ASIN.', { duration: 5000 });
+        }
       }
 
       // 4. Inject comparison table if detected
