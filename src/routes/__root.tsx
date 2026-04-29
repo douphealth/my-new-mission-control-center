@@ -6,7 +6,6 @@ import {
   Scripts,
 } from '@tanstack/react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { ErrorBoundary } from 'react-error-boundary';
 import { Toaster } from 'sonner';
 import appCss from '../styles.css?url';
@@ -81,7 +80,6 @@ function RootComponent() {
           <AuthProvider>
             <Outlet />
             <Toaster richColors position="top-right" />
-            <ReactQueryDevtools initialIsOpen={false} />
           </AuthProvider>
         </QueryClientProvider>
       </ErrorBoundary>
