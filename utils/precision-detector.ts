@@ -936,6 +936,7 @@ async function verifyWithAmazon(
   const validCandidates = candidates.filter(c => {
     const q = c.searchQuery?.trim();
     if (!q || q.length < 3) return false;
+    if (!c.asin && !isSpecificProductName(q)) return false;
     
     // Must have at least one detection source that isn't just AI
     const hasStructuralSource = c.sources.some(s => 
@@ -1139,7 +1140,7 @@ export async function detectProductsPrecision(
       
       // Convert AI candidates to DetectedCandidate format
       const aiDetected: DetectedCandidate[] = aiCandidates
-        .filter(ai => ai.confidence >= 50)
+        .filter(ai => ai.confidence >= 50 && isSpecificProductName(ai.searchQuery || ai.name))
         .map(ai => ({
           canonicalName: ai.name,
           nameVariants: [ai.name],
